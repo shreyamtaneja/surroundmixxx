@@ -80,6 +80,7 @@ class EngineMixer : public QObject, public AudioSource {
     // only call it before the engine has started mixing.
     void addChannel(std::unique_ptr<EngineChannel> pChannel);
     EngineChannel* getChannel(const QString& group);
+    const EngineChannel* getChannel(const QString& group) const;
     static inline CSAMPLE_GAIN gainForOrientation(EngineChannel::ChannelOrientation orientation,
             CSAMPLE_GAIN leftGain,
             CSAMPLE_GAIN centerGain,

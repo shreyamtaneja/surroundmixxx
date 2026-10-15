@@ -27,6 +27,7 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     ~EngineDeck() override;
 
     void process(CSAMPLE* pOutput, const std::size_t bufferSize) override;
+    std::span<const CSAMPLE> getSurroundBuffer() const override;
     void collectFeatures(GroupFeatureState* pGroupFeatures) const override;
 
     // postProcessLocalBpm() is called on all decks to update the localBpm after
@@ -96,6 +97,7 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     UserSettingsPointer m_pConfig;
     EngineBuffer* m_pBuffer;
     EnginePregain* m_pPregain;
+    mixxx::SampleBuffer m_surroundBuffer;
 
 #ifdef __STEM__
     // Stem buffer used to retrieve all the channel to mix together

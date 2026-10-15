@@ -900,6 +900,15 @@ EngineChannel* EngineMixer::getChannel(const QString& group) {
     return nullptr;
 }
 
+const EngineChannel* EngineMixer::getChannel(const QString& group) const {
+    for (const auto& pChannelInfo : m_channels) {
+        if (pChannelInfo->m_pChannel->getGroup() == group) {
+            return pChannelInfo->m_pChannel.get();
+        }
+    }
+    return nullptr;
+}
+
 CSAMPLE_GAIN EngineMixer::getMainGain(int channelIndex) const {
     if (channelIndex >= 0 && channelIndex < m_channelMainGainCache.size()) {
         return m_channelMainGainCache[channelIndex].m_gain;
@@ -942,7 +951,10 @@ std::span<const CSAMPLE> EngineMixer::buffer(const AudioOutput& output) const {
         return getOutputBusBuffer(output.getIndex());
         break;
     case AudioPathType::Deck:
-        return getDeckBuffer(output.getIndex());
+        if (auto* pChannel = getChannel(PlayerManager::groupForDeck(output.getIndex()))) {
+            return pChannel->getSurroundBuffer();
+        }
+        return {};
         break;
     case AudioPathType::RecordBroadcast:
         return getSidechainBuffer();

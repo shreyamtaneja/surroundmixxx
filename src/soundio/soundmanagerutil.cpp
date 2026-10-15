@@ -60,6 +60,10 @@ unsigned char AudioPath::getIndex() const {
     return m_index;
 }
 
+unsigned char AudioPath::getSourceChannelBase() const {
+    return m_sourceChannelBase;
+}
+
 /// Checks if this AudioPath's channels clash with another's
 /// (see ChannelGroup::clashesWith).
 bool AudioPath::channelsClash(const AudioPath &other) const {
@@ -233,7 +237,8 @@ mixxx::audio::ChannelCount AudioPath::maxChannelsForType(AudioPathType type) {
 AudioOutput::AudioOutput(AudioPathType type,
         unsigned char channelBase,
         mixxx::audio::ChannelCount channels,
-        unsigned char index)
+    unsigned char index,
+    unsigned char sourceChannelBase)
         : AudioPath(channelBase, channels) {
     // TODO(rryan): This is a virtual function call from a constructor.
     setType(type);
@@ -242,6 +247,7 @@ AudioOutput::AudioOutput(AudioPathType type,
     } else {
         m_index = 0;
     }
+    m_sourceChannelBase = sourceChannelBase;
 }
 
 /// Writes this AudioOutput's data to an XML element, preallocated from an XML
@@ -252,6 +258,7 @@ QDomElement AudioOutput::toXML(QDomElement *element) const {
     element->setAttribute("index", m_index);
     element->setAttribute("channel", m_channelGroup.getChannelBase());
     element->setAttribute("channel_count", m_channelGroup.getChannelCount().value());
+    element->setAttribute("source_channel", m_sourceChannelBase);
     return *element;
 }
 
@@ -263,6 +270,8 @@ AudioOutput AudioOutput::fromXML(const QDomElement &xml) {
     unsigned int channel(xml.attribute("channel", "0").toUInt());
     auto channels = mixxx::audio::ChannelCount::fromInt(
             xml.attribute("channel_count", "0").toInt());
+    const auto sourceChannelBase = static_cast<unsigned char>(
+            xml.attribute("source_channel", "0").toUInt());
     // In Mixxx < 1.12.0 we didn't save channels to file since they directly
     // corresponded to the type. To migrate users over, use mono for all
     // microphones and stereo for everything else since previously microphone
@@ -270,7 +279,7 @@ AudioOutput AudioOutput::fromXML(const QDomElement &xml) {
     if (!channels.isValid()) {
         channels = mixxx::audio::ChannelCount::stereo();
     }
-    return AudioOutput(type, channel, channels, index);
+    return AudioOutput(type, channel, channels, index, sourceChannelBase);
 }
 
 // static

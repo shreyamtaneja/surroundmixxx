@@ -82,6 +82,7 @@ class QmlSoundDeviceConnection : public QObject {
     Q_PROPERTY(int type READ getType CONSTANT)
     Q_PROPERTY(uchar channelGroup READ getChannelGroup CONSTANT)
     Q_PROPERTY(uchar index READ getIndex CONSTANT)
+    Q_PROPERTY(uchar sourceChannelBase READ getSourceChannelBase CONSTANT)
     QML_ANONYMOUS
   public:
     QmlSoundDeviceConnection(std::unique_ptr<AudioPath> path, QObject* parent = nullptr)
@@ -92,6 +93,7 @@ class QmlSoundDeviceConnection : public QObject {
     int getType() const;
     uchar getChannelGroup() const;
     uchar getIndex() const;
+    uchar getSourceChannelBase() const;
 
   private:
     std::unique_ptr<AudioPath> m_audioPath;
@@ -148,7 +150,8 @@ class QmlSoundManagerProxy : public QObject {
     Q_INVOKABLE void addOutput(mixxx::qml::QmlSoundOutputDeviceProxy* device,
             int type,
             unsigned char channelGroup,
-            unsigned char index);
+          unsigned char index,
+          unsigned char sourceChannelBase);
     Q_INVOKABLE void addInput(mixxx::qml::QmlSoundInputDeviceProxy* device,
             int type,
             unsigned char channelGroup,

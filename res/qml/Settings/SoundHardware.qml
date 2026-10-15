@@ -76,10 +76,12 @@ Category {
                     case "Booth":
                         type = 2;
                         break;
-                    case "Left Bus":
-                    case "Center Bus":
-                    case "Right Bus":
-                        index = connection.source.address.startsWith("Left") ? 0 : connection.source.address.startsWith("Right") ? 2 : 1;
+                    case "Crossfader Left Bus":
+                    case "Crossfader Center Bus":
+                    case "Crossfader Right Bus":
+                        index = connection.source.address.startsWith("Crossfader Left")
+                                ? 0
+                                : connection.source.address.startsWith("Crossfader Right") ? 2 : 1;
                         type = 3;
                         break;
                     default:
@@ -115,7 +117,12 @@ Category {
                 }
                 console.log(isOutput ? "addOutput" : "addInput", device, type, channel * 2, index);
                 if (isOutput) {
-                    manager.addOutput(device, type, channel * 2, index);
+                    manager.addOutput(
+                            device,
+                            type,
+                            channel * 2,
+                            index,
+                            connection.source.sourceChannelBase);
                 } else {
                     manager.addInput(device, type, channel * 2, index);
                 }

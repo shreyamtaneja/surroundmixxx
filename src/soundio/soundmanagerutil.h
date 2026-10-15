@@ -74,6 +74,7 @@ public:
   AudioPathType getType() const;
   ChannelGroup getChannelGroup() const;
   unsigned char getIndex() const;
+  unsigned char getSourceChannelBase() const;
   bool channelsClash(const AudioPath& other) const;
   QString getString() const;
   static QString getStringFromType(AudioPathType type);
@@ -94,7 +95,8 @@ public:
         // Exclude m_channelGroup from hash value!
         // See also: operator==()
         // TODO: Why??
-        return (static_cast<int>(m_type) << 8) |
+        return (static_cast<int>(m_type) << 16) |
+                (m_sourceChannelBase << 8) |
                 m_index;
   }
     friend qhash_seed_t qHash(
@@ -114,6 +116,7 @@ public:
     ChannelGroup m_channelGroup;
     AudioPathType m_type;
     unsigned char m_index;
+    unsigned char m_sourceChannelBase = 0;
 };
 
 // TODO: turn this into operator<=> once all targets fully support that
@@ -123,8 +126,8 @@ constexpr bool operator<(const AudioPath& lhs,
     // Exclude m_channelGroup from comparison!
     // See also: hashValue()/qHash()
     // TODO: Why??
-    return std::tie(lhs.m_type, lhs.m_index) <
-            std::tie(rhs.m_type, rhs.m_index);
+    return std::tie(lhs.m_type, lhs.m_index, lhs.m_sourceChannelBase) <
+            std::tie(rhs.m_type, rhs.m_index, rhs.m_sourceChannelBase);
 }
 
 constexpr bool operator==(const AudioPath& lhs,
@@ -132,8 +135,8 @@ constexpr bool operator==(const AudioPath& lhs,
     // Exclude m_channelGroup from comparison!
     // See also: hashValue()/qHash()
     // TODO: Why??
-    return std::tie(lhs.m_type, lhs.m_index) ==
-            std::tie(rhs.m_type, rhs.m_index);
+    return std::tie(lhs.m_type, lhs.m_index, lhs.m_sourceChannelBase) ==
+            std::tie(rhs.m_type, rhs.m_index, rhs.m_sourceChannelBase);
 }
 
 /// A source of audio in Mixxx that is to be output to a group of
@@ -143,7 +146,8 @@ class AudioOutput : public AudioPath {
     AudioOutput(AudioPathType type,
             unsigned char channelBase,
             mixxx::audio::ChannelCount channels,
-            unsigned char index = 0);
+          unsigned char index = 0,
+          unsigned char sourceChannelBase = 0);
     ~AudioOutput() override = default;
     QDomElement toXML(QDomElement *element) const;
     static AudioOutput fromXML(const QDomElement &xml);

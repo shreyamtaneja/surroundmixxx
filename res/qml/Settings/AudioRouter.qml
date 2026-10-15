@@ -80,7 +80,10 @@ Rectangle {
             return;
         for (let connection of connections) {
             let typeDef = audioTypeMap[connection.type];
-            let source = root.system[typeDef.entity].gateways[typeDef.channel][connection.index].edgeItem;
+            let sourceNode = root.system[typeDef.entity].gateways[typeDef.channel][connection.index];
+            let source = typeDef.entity == "Deck"
+                    ? sourceNode.itemAt(connection.sourceChannelBase / 2)?.edgeItem
+                    : sourceNode.edgeItem;
             let availableEdge = node.availableEdge();
             if (!source || availableEdge === null) {
                 console.error("Unable to get the source and sink of the existing connection!", source, availableEdge);
@@ -635,7 +638,8 @@ Rectangle {
                 {
                     name: "Output",
                     type: "source",
-                    advanced: true
+                    channels: [0, 1, 2, 3, 4, 5],
+                    channelLabels: ["Front L/R", "Center/LFE", "Surround L/R"]
                 },
                 {
                     name: "Vinyl Control",
@@ -660,7 +664,7 @@ Rectangle {
                 if (!root.system["Deck"].gateways[address]) {
                     root.system["Deck"].gateways[address] = [];
                 }
-                root.system["Deck"].gateways[address][deck.index] = node.itemAt(0);
+                root.system["Deck"].gateways[address][deck.index] = node;
             }
         }
     }
@@ -683,17 +687,17 @@ Rectangle {
                 type: "source"
             },
             {
-                name: "Left Bus",
+                name: "Crossfader Left Bus",
                 type: "source",
                 advanced: true
             },
             {
-                name: "Center Bus",
+                name: "Crossfader Center Bus",
                 type: "source",
                 advanced: true
             },
             {
-                name: "Right Bus",
+                name: "Crossfader Right Bus",
                 type: "source",
                 advanced: true
             },
@@ -727,7 +731,9 @@ Rectangle {
             }
             let nodeIdxOffset = 0;
             if (address.endsWith(" Bus")) {
-                nodeIdxOffset = address.startsWith("Left ") ? 0 : address.startsWith("Right ") ? 2 : 1;
+                nodeIdxOffset = address.startsWith("Crossfader Left ")
+                        ? 0
+                        : address.startsWith("Crossfader Right ") ? 2 : 1;
                 address = "Bus";
             }
             console.log("register", address, nodeIdxOffset);
