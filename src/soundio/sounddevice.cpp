@@ -94,7 +94,6 @@ void SoundDevice::composeOutputBuffer(CSAMPLE* outputBuffer,
     // the order of the list
 
     if (iFrameSize == 2 && m_audioOutputs.size() == 1 &&
-            m_audioOutputs.at(0).getType() != AudioPathType::Deck &&
             m_audioOutputs.at(0).getChannelGroup().getChannelCount() == 2) {
         // Special case for one stereo device only
         const AudioOutputBuffer& out = m_audioOutputs.at(0);
@@ -115,13 +114,7 @@ void SoundDevice::composeOutputBuffer(CSAMPLE* outputBuffer,
             const int iChannelBase = outChans.getChannelBase();
 
             const CSAMPLE* pAudioOutputBuffer = out.getBuffer();
-            const int sourceChannelCount =
-                    out.getType() == AudioPathType::Deck ? 6 : 2;
-            const int sourceChannelBase =
-                    out.getSourceChannelBase();
-            pAudioOutputBuffer =
-                    &pAudioOutputBuffer[framesReadOffset * sourceChannelCount +
-                            sourceChannelBase];
+                pAudioOutputBuffer = &pAudioOutputBuffer[framesReadOffset * 2];
             if (iChannelCount == 1) {
                 // All AudioOutputs are stereo as of Mixxx 1.12.0. If we have a mono
                 // output then we need to downsample.
@@ -130,16 +123,15 @@ void SoundDevice::composeOutputBuffer(CSAMPLE* outputBuffer,
                     // sample in a frame)
                     const SINT iFrameBase = iFrameNo * iFrameSize;
                     outputBuffer[iFrameBase + iChannelBase] = SampleUtil::clampSample(
-                            (pAudioOutputBuffer[iFrameNo * sourceChannelCount] +
-                                    pAudioOutputBuffer[iFrameNo * sourceChannelCount + 1]) / 2.0f);
+                            (pAudioOutputBuffer[iFrameNo * 2] +
+                                pAudioOutputBuffer[iFrameNo * 2 + 1]) / 2.0f);
                 }
             } else {
                 for (SINT iFrameNo = 0; iFrameNo < framesToCompose; ++iFrameNo) {
                     // iFrameBase is the "base sample" in a frame (ie. the first
                     // sample in a frame)
                     const SINT iFrameBase = iFrameNo * iFrameSize;
-                    const SINT iLocalFrameBase =
-                            iFrameNo * sourceChannelCount + sourceChannelBase;
+                        const SINT iLocalFrameBase = iFrameNo * iChannelCount;
 
                     // this will make sure a sample from each channel is copied
                     for (int iChannel = 0; iChannel < iChannelCount; ++iChannel) {

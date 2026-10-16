@@ -368,16 +368,12 @@ void PlayerManager::addDeckInner() {
     m_decks.append(pDeck);
 
     // Register the deck output with SoundManager.
-        for (unsigned char sourceChannelBase = 0; sourceChannelBase < 6;
-                sourceChannelBase += 2) {
-        m_pSoundManager->registerOutput(
-            AudioOutput(AudioPathType::Deck,
+            m_pSoundManager->registerOutput(
+                AudioOutput(AudioPathType::Deck,
                     0,
-                mixxx::audio::ChannelCount::stereo(),
-                deckIndex,
-                sourceChannelBase),
-            m_pEngine);
-        }
+                    mixxx::audio::ChannelCount::stereo(),
+                    deckIndex),
+                m_pEngine);
 
     // Register vinyl input signal with deck for passthrough support.
     EngineDeck* pEngineDeck = pDeck->getEngineDeck();

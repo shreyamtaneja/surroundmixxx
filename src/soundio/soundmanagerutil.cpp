@@ -60,10 +60,6 @@ unsigned char AudioPath::getIndex() const {
     return m_index;
 }
 
-unsigned char AudioPath::getSourceChannelBase() const {
-    return m_sourceChannelBase;
-}
-
 /// Checks if this AudioPath's channels clash with another's
 /// (see ChannelGroup::clashesWith).
 bool AudioPath::channelsClash(const AudioPath &other) const {
@@ -91,6 +87,8 @@ QString AudioPath::getStringFromType(AudioPathType type) {
         return QStringLiteral("Booth");
     case AudioPathType::Bus:
         return QStringLiteral("Bus");
+    case AudioPathType::Surround:
+        return QStringLiteral("Surround");
     case AudioPathType::Deck:
         return QStringLiteral("Deck");
     case AudioPathType::VinylControl:
@@ -145,6 +143,17 @@ QString AudioPath::getTrStringFromType(AudioPathType type, unsigned char index) 
         //: Audio path indetifier
         return QString("%1 %2").arg(QObject::tr("Deck"),
                                     QString::number(index + 1));
+    case AudioPathType::Surround:
+        switch (index) {
+        case 0:
+            return QObject::tr("Surround Front L/R");
+        case 1:
+            return QObject::tr("Surround Center/Sub");
+        case 2:
+            return QObject::tr("Surround L/R");
+        default:
+            return QObject::tr("Invalid Surround Output");
+        }
     case AudioPathType::VinylControl:
         //: Audio path indetifier
         return QString("%1 %2").arg(QObject::tr("Vinyl Control"),
@@ -179,6 +188,8 @@ AudioPathType AudioPath::getTypeFromString(QString string) {
         return AudioPathType::Bus;
     } else if (string == AudioPath::getStringFromType(AudioPathType::Deck).toLower()) {
         return AudioPathType::Deck;
+    } else if (string == AudioPath::getStringFromType(AudioPathType::Surround).toLower()) {
+        return AudioPathType::Surround;
     } else if (string == AudioPath::getStringFromType(AudioPathType::VinylControl).toLower()) {
         return AudioPathType::VinylControl;
     } else if (string == AudioPath::getStringFromType(AudioPathType::Microphone).toLower()) {
@@ -198,6 +209,7 @@ bool AudioPath::isIndexed(AudioPathType type) {
     switch (type) {
     case AudioPathType::Bus:
     case AudioPathType::Deck:
+    case AudioPathType::Surround:
     case AudioPathType::VinylControl:
     case AudioPathType::Microphone:
     case AudioPathType::Auxiliary:
@@ -237,8 +249,7 @@ mixxx::audio::ChannelCount AudioPath::maxChannelsForType(AudioPathType type) {
 AudioOutput::AudioOutput(AudioPathType type,
         unsigned char channelBase,
         mixxx::audio::ChannelCount channels,
-    unsigned char index,
-    unsigned char sourceChannelBase)
+    unsigned char index)
         : AudioPath(channelBase, channels) {
     // TODO(rryan): This is a virtual function call from a constructor.
     setType(type);
@@ -247,7 +258,6 @@ AudioOutput::AudioOutput(AudioPathType type,
     } else {
         m_index = 0;
     }
-    m_sourceChannelBase = sourceChannelBase;
 }
 
 /// Writes this AudioOutput's data to an XML element, preallocated from an XML
@@ -258,7 +268,6 @@ QDomElement AudioOutput::toXML(QDomElement *element) const {
     element->setAttribute("index", m_index);
     element->setAttribute("channel", m_channelGroup.getChannelBase());
     element->setAttribute("channel_count", m_channelGroup.getChannelCount().value());
-    element->setAttribute("source_channel", m_sourceChannelBase);
     return *element;
 }
 
@@ -279,7 +288,12 @@ AudioOutput AudioOutput::fromXML(const QDomElement &xml) {
     if (!channels.isValid()) {
         channels = mixxx::audio::ChannelCount::stereo();
     }
-    return AudioOutput(type, channel, channels, index, sourceChannelBase);
+    if (type == AudioPathType::Deck && sourceChannelBase > 0 &&
+            sourceChannelBase < 6 && sourceChannelBase % 2 == 0) {
+        type = AudioPathType::Surround;
+        index = sourceChannelBase / 2;
+    }
+    return AudioOutput(type, channel, channels, index);
 }
 
 // static
@@ -292,6 +306,7 @@ QList<AudioPathType> AudioOutput::getSupportedTypes() {
             AudioPathType::Headphones,
             AudioPathType::Bus,
             AudioPathType::Deck,
+            AudioPathType::Surround,
             AudioPathType::RecordBroadcast,
     };
 }

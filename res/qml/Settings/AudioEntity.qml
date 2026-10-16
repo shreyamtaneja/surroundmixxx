@@ -81,7 +81,6 @@ Item {
                     readonly property string label: root.gateways[index].name
                     readonly property bool required: !!root.gateways[index].required
                     readonly property string type: root.gateways[index].type
-                    readonly property var channelLabels: root.gateways[index].channelLabels || null
 
                     function assignedEdges() {
                         let assignation = {};
@@ -142,9 +141,7 @@ Item {
                                 elide: Text.ElideRight
                                 font.pixelSize: 10
                                 fontSizeMode: Text.Fit
-                                text: node.instances == 1
-                                    ? (node.channelLabels ? node.channelLabels[index] : label)
-                                    : `${label} #${index + 1}`
+                                text: node.instances == 1 ? label : `${label} #${index + 1}`
                                 verticalAlignment: Text.AlignVCenter
                             }
                             // Item {
@@ -178,7 +175,6 @@ Item {
                             property var address: node.address
                             property var advanced: node.advanced
                             property bool connecting: false
-                            property int sourceChannelBase: node.channels[channel.index * 2] || 0
                             property var connection: null
                             property bool counted: false
                             property var entity: root

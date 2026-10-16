@@ -77,9 +77,6 @@ uchar QmlSoundDeviceConnection::getChannelGroup() const {
 uchar QmlSoundDeviceConnection::getIndex() const {
     return m_audioPath->getIndex();
 }
-uchar QmlSoundDeviceConnection::getSourceChannelBase() const {
-    return m_audioPath->getSourceChannelBase();
-}
 
 QmlSoundManagerProxy::QmlSoundManagerProxy(
         std::shared_ptr<SoundManager> pSoundManager,
@@ -218,8 +215,7 @@ void QmlSoundManagerProxy::setAudioBufferSizeIndex(unsigned int latency) {
 void QmlSoundManagerProxy::addOutput(QmlSoundOutputDeviceProxy* device,
         int type,
         unsigned char channelGroup,
-    unsigned char index,
-    unsigned char sourceChannelBase) {
+    unsigned char index) {
     VERIFY_OR_DEBUG_ASSERT(device && qml_owned_ptr<QmlSoundOutputDeviceProxy>(device)) {
         return;
     }
@@ -227,8 +223,7 @@ void QmlSoundManagerProxy::addOutput(QmlSoundOutputDeviceProxy* device,
             AudioOutput(static_cast<AudioPathType>(type),
                     channelGroup,
                     mixxx::audio::ChannelCount::stereo(),
-                    index,
-                    sourceChannelBase));
+                    index));
 }
 
 void QmlSoundManagerProxy::addInput(QmlSoundInputDeviceProxy* device,
