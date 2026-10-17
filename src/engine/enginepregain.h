@@ -25,6 +25,12 @@ class EnginePregain : public EngineObject {
 
     void process(CSAMPLE* pInOut, const std::size_t bufferSize) override;
 
+    // Returns the last gain value applied by process(). Used by EngineDeck
+    // to apply the same gain to the surround output buffer.
+    CSAMPLE_GAIN getGain() const {
+        return m_fPrevGain;
+    }
+
     void collectFeatures(GroupFeatureState* pGroupFeatures) const override;
 
   private:

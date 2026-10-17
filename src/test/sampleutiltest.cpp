@@ -466,6 +466,49 @@ TEST_F(SampleUtilTest, mixMultichannelToStereo) {
     EXPECT_FLOAT_EQ(destination[3], 0.9f + 1.1f + 1.3f /* + 1.5f*/);
 }
 
+TEST_F(SampleUtilTest, mixSurround51ToStereo) {
+    constexpr int kNumFrames = 2;
+    constexpr int kSurroundChannels = 6;
+    constexpr int kTotalSamples = kNumFrames * kSurroundChannels;
+
+    EXPECT_TRUE(buffers.size() > 1 && sizes[0] >= kTotalSamples && sizes[1] >= kNumFrames * 2);
+    CSAMPLE* source = buffers[0];
+    CSAMPLE* destination = buffers[1];
+
+    // Frame 0:
+    // L=1.0, R=0.5, C=0.8, LFE=10.0 (should be discarded), Ls=0.4, Rs=0.2
+    source[0] = 1.0f;
+    source[1] = 0.5f;
+    source[2] = 0.8f;
+    source[3] = 10.0f; // LFE
+    source[4] = 0.4f;
+    source[5] = 0.2f;
+
+    // Frame 1:
+    // L=0.0, R=0.0, C=1.0, LFE=-5.0, Ls=0.0, Rs=0.0
+    source[6] = 0.0f;
+    source[7] = 0.0f;
+    source[8] = 1.0f;
+    source[9] = -5.0f; // LFE
+    source[10] = 0.0f;
+    source[11] = 0.0f;
+
+    SampleUtil::mixSurround51ToStereo(destination, source, kNumFrames);
+
+    constexpr CSAMPLE kGain = 0.70710678f;
+    // Frame 0:
+    // Left  = L + 0.7071 * (C + Ls) = 1.0 + 0.70710678 * (0.8 + 0.4)
+    // Right = R + 0.7071 * (C + Rs) = 0.5 + 0.70710678 * (0.8 + 0.2)
+    EXPECT_NEAR(destination[0], 1.0f + kGain * 1.2f, 1e-5f);
+    EXPECT_NEAR(destination[1], 0.5f + kGain * 1.0f, 1e-5f);
+
+    // Frame 1:
+    // Left  = 0.0 + 0.7071 * (1.0 + 0.0) = 0.70710678
+    // Right = 0.0 + 0.7071 * (1.0 + 0.0) = 0.70710678
+    EXPECT_NEAR(destination[2], kGain, 1e-5f);
+    EXPECT_NEAR(destination[3], kGain, 1e-5f);
+}
+
 static void BM_MemCpy(benchmark::State& state) {
     SINT size = static_cast<SINT>(state.range(0));
     CSAMPLE* buffer = SampleUtil::alloc(size);

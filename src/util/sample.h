@@ -321,7 +321,7 @@ class SampleUtil {
     // channel. This uses a simple (L+R)/2 method, which assumes that the multi
     // channel buffer input is composed of stereo pair. Note that function
     // cannot be optimised using loop vectorization and so shouldn't be used for
-    // real-time use case. The exclude channel mask can bne used to exclude a
+    // real-time use case. The exclude channel mask can be used to exclude a
     // stereo pair (two consecutive channel) out of the mix. The LSB is the
     // first stereo channel
     static void mixMultichannelToStereo(CSAMPLE* pDest,
@@ -334,6 +334,14 @@ class SampleUtil {
             const CSAMPLE* pSrc,
             SINT numFrames,
             mixxx::audio::ChannelCount numChannels);
+
+    // Mixes a 6-channel 5.1 surround buffer down to stereo according to ITU-R BS.775:
+    // Left  = L + 0.7071 * C + 0.7071 * Ls
+    // Right = R + 0.7071 * C + 0.7071 * Rs
+    // LFE (channel index 3) is omitted to avoid distortion and phase mud in headphones.
+    static void mixSurround51ToStereo(CSAMPLE* pDest,
+            const CSAMPLE* pSrc,
+            SINT numFrames);
 
     // In-place doubles the mono samples in pBuffer to dual mono samples.
     // (numFrames) samples will be read from pBuffer

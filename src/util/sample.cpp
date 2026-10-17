@@ -818,6 +818,26 @@ void SampleUtil::mixMultichannelToStereo(CSAMPLE* pDest,
 }
 
 // static
+void SampleUtil::mixSurround51ToStereo(CSAMPLE* pDest,
+        const CSAMPLE* pSrc,
+        SINT numFrames) {
+    constexpr CSAMPLE kCenterSurroundGain = 0.70710678f; // -3 dB
+    // 5.1 layout: [0]=L, [1]=R, [2]=C, [3]=LFE, [4]=Ls, [5]=Rs
+    for (SINT i = 0; i < numFrames; ++i) {
+        const SINT srcIdx = i * 6;
+        const SINT destIdx = i * 2;
+        const CSAMPLE fl = pSrc[srcIdx];
+        const CSAMPLE fr = pSrc[srcIdx + 1];
+        const CSAMPLE c = pSrc[srcIdx + 2];
+        const CSAMPLE sl = pSrc[srcIdx + 4];
+        const CSAMPLE sr = pSrc[srcIdx + 5];
+
+        pDest[destIdx] = fl + kCenterSurroundGain * (c + sl);
+        pDest[destIdx + 1] = fr + kCenterSurroundGain * (c + sr);
+    }
+}
+
+// static
 void SampleUtil::doubleMonoToDualMono(CSAMPLE* pBuffer, SINT numFrames) {
     // backward loop
     SINT i = numFrames;
