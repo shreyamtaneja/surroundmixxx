@@ -87,6 +87,8 @@ QString AudioPath::getStringFromType(AudioPathType type) {
         return QStringLiteral("Booth");
     case AudioPathType::Bus:
         return QStringLiteral("Bus");
+    case AudioPathType::Surround:
+        return QStringLiteral("Surround");
     case AudioPathType::Deck:
         return QStringLiteral("Deck");
     case AudioPathType::VinylControl:
@@ -141,6 +143,17 @@ QString AudioPath::getTrStringFromType(AudioPathType type, unsigned char index) 
         //: Audio path indetifier
         return QString("%1 %2").arg(QObject::tr("Deck"),
                                     QString::number(index + 1));
+    case AudioPathType::Surround:
+        switch (index) {
+        case 0:
+            return QObject::tr("Surround Front L/R");
+        case 1:
+            return QObject::tr("Surround Center/Sub");
+        case 2:
+            return QObject::tr("Surround L/R");
+        default:
+            return QObject::tr("Invalid Surround Output");
+        }
     case AudioPathType::VinylControl:
         //: Audio path indetifier
         return QString("%1 %2").arg(QObject::tr("Vinyl Control"),
@@ -175,6 +188,8 @@ AudioPathType AudioPath::getTypeFromString(QString string) {
         return AudioPathType::Bus;
     } else if (string == AudioPath::getStringFromType(AudioPathType::Deck).toLower()) {
         return AudioPathType::Deck;
+    } else if (string == AudioPath::getStringFromType(AudioPathType::Surround).toLower()) {
+        return AudioPathType::Surround;
     } else if (string == AudioPath::getStringFromType(AudioPathType::VinylControl).toLower()) {
         return AudioPathType::VinylControl;
     } else if (string == AudioPath::getStringFromType(AudioPathType::Microphone).toLower()) {
@@ -194,6 +209,7 @@ bool AudioPath::isIndexed(AudioPathType type) {
     switch (type) {
     case AudioPathType::Bus:
     case AudioPathType::Deck:
+    case AudioPathType::Surround:
     case AudioPathType::VinylControl:
     case AudioPathType::Microphone:
     case AudioPathType::Auxiliary:
@@ -233,7 +249,7 @@ mixxx::audio::ChannelCount AudioPath::maxChannelsForType(AudioPathType type) {
 AudioOutput::AudioOutput(AudioPathType type,
         unsigned char channelBase,
         mixxx::audio::ChannelCount channels,
-        unsigned char index)
+    unsigned char index)
         : AudioPath(channelBase, channels) {
     // TODO(rryan): This is a virtual function call from a constructor.
     setType(type);
@@ -263,12 +279,19 @@ AudioOutput AudioOutput::fromXML(const QDomElement &xml) {
     unsigned int channel(xml.attribute("channel", "0").toUInt());
     auto channels = mixxx::audio::ChannelCount::fromInt(
             xml.attribute("channel_count", "0").toInt());
+    const auto sourceChannelBase = static_cast<unsigned char>(
+            xml.attribute("source_channel", "0").toUInt());
     // In Mixxx < 1.12.0 we didn't save channels to file since they directly
     // corresponded to the type. To migrate users over, use mono for all
     // microphones and stereo for everything else since previously microphone
     // inputs were the only mono AudioPath.
     if (!channels.isValid()) {
         channels = mixxx::audio::ChannelCount::stereo();
+    }
+    if (type == AudioPathType::Deck && sourceChannelBase > 0 &&
+            sourceChannelBase < 6 && sourceChannelBase % 2 == 0) {
+        type = AudioPathType::Surround;
+        index = sourceChannelBase / 2;
     }
     return AudioOutput(type, channel, channels, index);
 }
@@ -283,6 +306,7 @@ QList<AudioPathType> AudioOutput::getSupportedTypes() {
             AudioPathType::Headphones,
             AudioPathType::Bus,
             AudioPathType::Deck,
+            AudioPathType::Surround,
             AudioPathType::RecordBroadcast,
     };
 }

@@ -80,6 +80,7 @@ class EngineMixer : public QObject, public AudioSource {
     // only call it before the engine has started mixing.
     void addChannel(std::unique_ptr<EngineChannel> pChannel);
     EngineChannel* getChannel(const QString& group);
+    const EngineChannel* getChannel(const QString& group) const;
     static inline CSAMPLE_GAIN gainForOrientation(EngineChannel::ChannelOrientation orientation,
             CSAMPLE_GAIN leftGain,
             CSAMPLE_GAIN centerGain,
@@ -280,6 +281,7 @@ class EngineMixer : public QObject, public AudioSource {
     // Pre-allocated buffers for performing channel mixing in the callback.
     QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_activeChannels;
     QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_activeBusChannels[3];
+    QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_activeSurroundChannels;
     QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_activeHeadphoneChannels;
     QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_activeTalkoverChannels;
 
@@ -287,6 +289,7 @@ class EngineMixer : public QObject, public AudioSource {
 
     // Mixing buffers for each output.
     std::array<mixxx::SampleBuffer, 3> m_outputBusBuffers;
+    std::array<mixxx::SampleBuffer, 3> m_surroundOutputBuffers;
     mixxx::SampleBuffer m_booth;
     mixxx::SampleBuffer m_head;
     mixxx::SampleBuffer m_talkover;

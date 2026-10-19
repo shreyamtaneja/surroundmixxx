@@ -148,7 +148,7 @@ class QmlSoundManagerProxy : public QObject {
     Q_INVOKABLE void addOutput(mixxx::qml::QmlSoundOutputDeviceProxy* device,
             int type,
             unsigned char channelGroup,
-            unsigned char index);
+          unsigned char index);
     Q_INVOKABLE void addInput(mixxx::qml::QmlSoundInputDeviceProxy* device,
             int type,
             unsigned char channelGroup,

@@ -114,8 +114,7 @@ void SoundDevice::composeOutputBuffer(CSAMPLE* outputBuffer,
             const int iChannelBase = outChans.getChannelBase();
 
             const CSAMPLE* pAudioOutputBuffer = out.getBuffer();
-            // advanced to offset; pAudioOutputBuffer is always stereo
-            pAudioOutputBuffer = &pAudioOutputBuffer[framesReadOffset*2];
+                pAudioOutputBuffer = &pAudioOutputBuffer[framesReadOffset * 2];
             if (iChannelCount == 1) {
                 // All AudioOutputs are stereo as of Mixxx 1.12.0. If we have a mono
                 // output then we need to downsample.
@@ -125,14 +124,14 @@ void SoundDevice::composeOutputBuffer(CSAMPLE* outputBuffer,
                     const SINT iFrameBase = iFrameNo * iFrameSize;
                     outputBuffer[iFrameBase + iChannelBase] = SampleUtil::clampSample(
                             (pAudioOutputBuffer[iFrameNo * 2] +
-                                    pAudioOutputBuffer[iFrameNo * 2 + 1]) / 2.0f);
+                                pAudioOutputBuffer[iFrameNo * 2 + 1]) / 2.0f);
                 }
             } else {
                 for (SINT iFrameNo = 0; iFrameNo < framesToCompose; ++iFrameNo) {
                     // iFrameBase is the "base sample" in a frame (ie. the first
                     // sample in a frame)
                     const SINT iFrameBase = iFrameNo * iFrameSize;
-                    const SINT iLocalFrameBase = iFrameNo * iChannelCount;
+                        const SINT iLocalFrameBase = iFrameNo * iChannelCount;
 
                     // this will make sure a sample from each channel is copied
                     for (int iChannel = 0; iChannel < iChannelCount; ++iChannel) {

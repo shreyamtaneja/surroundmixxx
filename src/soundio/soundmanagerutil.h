@@ -67,6 +67,7 @@ public:
       Microphone,
       Auxiliary,
       RecordBroadcast,
+      Surround,
       Invalid, // if this isn't last bad things will happen -bkgood
   };
   AudioPath(unsigned char channelBase, mixxx::audio::ChannelCount channels);
@@ -123,8 +124,8 @@ constexpr bool operator<(const AudioPath& lhs,
     // Exclude m_channelGroup from comparison!
     // See also: hashValue()/qHash()
     // TODO: Why??
-    return std::tie(lhs.m_type, lhs.m_index) <
-            std::tie(rhs.m_type, rhs.m_index);
+        return std::tie(lhs.m_type, lhs.m_index) <
+          std::tie(rhs.m_type, rhs.m_index);
 }
 
 constexpr bool operator==(const AudioPath& lhs,
@@ -132,8 +133,8 @@ constexpr bool operator==(const AudioPath& lhs,
     // Exclude m_channelGroup from comparison!
     // See also: hashValue()/qHash()
     // TODO: Why??
-    return std::tie(lhs.m_type, lhs.m_index) ==
-            std::tie(rhs.m_type, rhs.m_index);
+        return std::tie(lhs.m_type, lhs.m_index) ==
+          std::tie(rhs.m_type, rhs.m_index);
 }
 
 /// A source of audio in Mixxx that is to be output to a group of
@@ -143,7 +144,7 @@ class AudioOutput : public AudioPath {
     AudioOutput(AudioPathType type,
             unsigned char channelBase,
             mixxx::audio::ChannelCount channels,
-            unsigned char index = 0);
+          unsigned char index = 0);
     ~AudioOutput() override = default;
     QDomElement toXML(QDomElement *element) const;
     static AudioOutput fromXML(const QDomElement &xml);

@@ -196,7 +196,7 @@ void DlgPrefSoundItem::loadPath(const SoundManagerConfig &config) {
     if (m_isInput) {
         const auto inputDeviceMap = config.getInputs();
         for (auto it = inputDeviceMap.cbegin(); it != inputDeviceMap.cend(); ++it) {
-            if (it.value().getType() == m_type && it.value().getIndex() == m_index) {
+                    if (it.value().getType() == m_type && it.value().getIndex() == m_index) {
                 setDevice(it.key());
                 setChannel(it.value().getChannelGroup().getChannelBase(),
                             it.value().getChannelGroup().getChannelCount());
@@ -244,7 +244,7 @@ void DlgPrefSoundItem::writePath(SoundManagerConfig* config) const {
     } else {
         config->addOutput(
                 pDevice->getDeviceId(),
-                AudioOutput(m_type, channelBase, channelCount, m_index));
+            AudioOutput(m_type, channelBase, channelCount, m_index));
     }
 }
 

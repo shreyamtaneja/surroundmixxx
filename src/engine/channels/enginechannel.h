@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 #include "control/pollingcontrolproxy.h"
 #include "engine/channelhandle.h"
 #include "engine/engineobject.h"
@@ -44,6 +46,10 @@ class EngineChannel : public EngineObject {
     virtual ActiveState updateActiveState() = 0;
     virtual bool isActive() {
         return m_active;
+    }
+
+    virtual std::span<const CSAMPLE> getSurroundBuffer() const {
+        return {};
     }
 
     void setPfl(bool enabled);

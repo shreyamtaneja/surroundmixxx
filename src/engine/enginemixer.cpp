@@ -56,6 +56,9 @@ EngineMixer::EngineMixer(UserSettingsPointer pConfig,
           m_outputBusBuffers({mixxx::SampleBuffer(kMaxEngineSamples),
                   mixxx::SampleBuffer(kMaxEngineSamples),
                   mixxx::SampleBuffer(kMaxEngineSamples)}),
+          m_surroundOutputBuffers({mixxx::SampleBuffer(kMaxEngineSamples),
+              mixxx::SampleBuffer(kMaxEngineSamples),
+              mixxx::SampleBuffer(kMaxEngineSamples)}),
           m_booth(kMaxEngineSamples),
           m_head(kMaxEngineSamples),
           m_talkover(kMaxEngineSamples),
@@ -202,6 +205,9 @@ EngineMixer::EngineMixer(UserSettingsPointer pConfig,
     for (auto& buffer : m_outputBusBuffers) {
         buffer.clear();
     }
+    for (auto& buffer : m_surroundOutputBuffers) {
+        buffer.clear();
+    }
 
     // X-Fader Setup
     m_pXFaderMode->setButtonMode(mixxx::control::ButtonMode::Toggle);
@@ -238,6 +244,7 @@ void EngineMixer::processChannels(std::size_t bufferSize) {
     m_activeBusChannels[EngineChannel::LEFT].clear();
     m_activeBusChannels[EngineChannel::CENTER].clear();
     m_activeBusChannels[EngineChannel::RIGHT].clear();
+    m_activeSurroundChannels.clear();
     m_activeHeadphoneChannels.clear();
     m_activeTalkoverChannels.clear();
     m_activeChannels.clear();
@@ -286,6 +293,7 @@ void EngineMixer::processChannels(std::size_t bufferSize) {
                     !pChannelInfo->m_pMuteControl->toBool()) {
                 // the xFader-Mix
                 m_activeBusChannels[pChannel->getOrientation()].append(pChannelInfo);
+                m_activeSurroundChannels.append(pChannelInfo);
             } else {
                 // Check if we need to fade out the channel
                 GainCache& gainCache = m_channelMainGainCache[i];
@@ -385,6 +393,34 @@ void EngineMixer::process(const std::size_t bufferSize) {
     // Prepare all channels for output
     processChannels(bufferSize);
 
+    CSAMPLE_GAIN crossfaderLeftGain, crossfaderRightGain;
+    EngineXfader::getXfadeGains(m_pCrossfader->get(), m_pXFaderCurve->get(),
+            m_pXFaderCalibration->get(),
+            m_pXFaderMode->get(),
+            m_pXFaderReverse->toBool(),
+            &crossfaderLeftGain, &crossfaderRightGain);
+    m_mainGain.setGains(crossfaderLeftGain, 1.0f, crossfaderRightGain);
+
+    for (auto& surroundBuffer : m_surroundOutputBuffers) {
+        surroundBuffer.clear(bufferSize);
+    }
+    for (ChannelInfo* pChannelInfo : std::as_const(m_activeSurroundChannels)) {
+        const auto source = pChannelInfo->m_pChannel->getSurroundBuffer();
+        if (source.size() < static_cast<std::size_t>(iFrames) * 6) {
+            continue;
+        }
+        const CSAMPLE_GAIN gain = m_mainGain.getGain(pChannelInfo);
+        for (unsigned int frame = 0; frame < iFrames; ++frame) {
+            const std::size_t sourceFrame = frame * 6;
+            const std::size_t outputFrame = frame * 2;
+            for (unsigned int pair = 0; pair < m_surroundOutputBuffers.size(); ++pair) {
+                CSAMPLE* output = m_surroundOutputBuffers[pair].data();
+                output[outputFrame] += source[sourceFrame + pair * 2] * gain;
+                output[outputFrame + 1] += source[sourceFrame + pair * 2 + 1] * gain;
+            }
+        }
+    }
+
     // Compute headphone mix
     // Head phone left/right mix
     CSAMPLE pflMixGainInHeadphones = 1;
@@ -479,19 +515,9 @@ void EngineMixer::process(const std::size_t bufferSize) {
         break;
     }
 
-    // Calculate the crossfader gains for left and right side of the crossfader
-    CSAMPLE_GAIN crossfaderLeftGain, crossfaderRightGain;
-    EngineXfader::getXfadeGains(m_pCrossfader->get(), m_pXFaderCurve->get(),
-                                m_pXFaderCalibration->get(),
-                                m_pXFaderMode->get(),
-                                m_pXFaderReverse->toBool(),
-                                &crossfaderLeftGain, &crossfaderRightGain);
-
     // Make the mix for each crossfader orientation output bus.
     // m_mainGain takes care of applying the attenuation from
     // channel volume faders and crossfader.
-    m_mainGain.setGains(crossfaderLeftGain, 1.0f, crossfaderRightGain);
-
     for (int o = EngineChannel::LEFT; o <= EngineChannel::RIGHT; o++) {
         ChannelMixer::applyEffectsInPlaceAndMixChannels(m_mainGain,
                 m_activeBusChannels[o],
@@ -882,6 +908,7 @@ void EngineMixer::addChannel(std::unique_ptr<EngineChannel> pChannel) {
     m_activeBusChannels[EngineChannel::LEFT].reserve(m_channels.size());
     m_activeBusChannels[EngineChannel::CENTER].reserve(m_channels.size());
     m_activeBusChannels[EngineChannel::RIGHT].reserve(m_channels.size());
+    m_activeSurroundChannels.reserve(m_channels.size());
     m_activeHeadphoneChannels.reserve(m_channels.size());
     m_activeTalkoverChannels.reserve(m_channels.size());
 
@@ -892,6 +919,15 @@ void EngineMixer::addChannel(std::unique_ptr<EngineChannel> pChannel) {
 
 EngineChannel* EngineMixer::getChannel(const QString& group) {
     // TODO: convert to C++20 ranges using projections or use hash-based lookup based on the group
+    for (const auto& pChannelInfo : m_channels) {
+        if (pChannelInfo->m_pChannel->getGroup() == group) {
+            return pChannelInfo->m_pChannel.get();
+        }
+    }
+    return nullptr;
+}
+
+const EngineChannel* EngineMixer::getChannel(const QString& group) const {
     for (const auto& pChannelInfo : m_channels) {
         if (pChannelInfo->m_pChannel->getGroup() == group) {
             return pChannelInfo->m_pChannel.get();
@@ -943,6 +979,11 @@ std::span<const CSAMPLE> EngineMixer::buffer(const AudioOutput& output) const {
         break;
     case AudioPathType::Deck:
         return getDeckBuffer(output.getIndex());
+    case AudioPathType::Surround:
+        if (output.getIndex() < m_surroundOutputBuffers.size()) {
+            return m_surroundOutputBuffers[output.getIndex()].span();
+        }
+        return {};
         break;
     case AudioPathType::RecordBroadcast:
         return getSidechainBuffer();
@@ -972,6 +1013,8 @@ void EngineMixer::onOutputConnected(const AudioOutput& output) {
     case AudioPathType::Deck:
         // We don't track enabled decks.
         break;
+    case AudioPathType::Surround:
+        break;
     case AudioPathType::RecordBroadcast:
         // We don't track enabled sidechain.
         break;
@@ -997,6 +1040,8 @@ void EngineMixer::onOutputDisconnected(const AudioOutput& output) {
         break;
     case AudioPathType::Deck:
         // We don't track enabled decks.
+        break;
+    case AudioPathType::Surround:
         break;
     case AudioPathType::RecordBroadcast:
         // We don't track enabled sidechain.
@@ -1068,6 +1113,14 @@ void EngineMixer::registerNonEngineChannelSoundIO(gsl::not_null<SoundManager*> p
                         0,
                         mixxx::audio::ChannelCount::stereo(),
                         o),
+                this);
+    }
+    for (unsigned char pair = 0; pair < 3; ++pair) {
+        pSoundManager->registerOutput(
+                AudioOutput(AudioPathType::Surround,
+                        0,
+                        mixxx::audio::ChannelCount::stereo(),
+                        pair),
                 this);
     }
     pSoundManager->registerOutput(AudioOutput(AudioPathType::RecordBroadcast,

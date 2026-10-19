@@ -12,6 +12,7 @@
 #include "moc_enginedeck.cpp"
 #include "track/track.h"
 #include "util/assert.h"
+#include "util/defs.h"
 #include "util/sample.h"
 
 EngineDeck::EngineDeck(
@@ -49,12 +50,14 @@ EngineDeck::EngineDeck(
             pMixingEngine,
 #ifdef __STEM__
             primaryDeck ? mixxx::audio::ChannelCount::stem()
-                        : mixxx::audio::ChannelCount::stereo()
+                        : mixxx::audio::ChannelCount(6)
 
 #else
-            mixxx::audio::ChannelCount::stereo()
+            mixxx::audio::ChannelCount(6)
 #endif
     );
+    m_surroundBuffer = mixxx::SampleBuffer(kMaxEngineFrames * 6);
+    m_surroundBuffer.clear();
 
 #ifdef __STEM__
     if (!primaryDeck) {
@@ -227,6 +230,8 @@ void EngineDeck::cloneStemState(const EngineDeck* deckToClone) {
 #endif
 
 void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
+    m_surroundBuffer.clear(bufferSize * 3);
+
     // Feed the incoming audio through if passthrough is active
     const CSAMPLE* sampleBuffer = m_sampleBuffer; // save pointer on stack
     if (isPassthroughActive() && sampleBuffer) {
@@ -244,22 +249,88 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
 
 #ifdef __STEM__
         // Process the raw audio
-        if (m_pBuffer->getChannelCount() <= mixxx::kEngineChannelOutputCount) {
-            // Process a single mono or stereo channel
-#endif
-            m_pBuffer->process(pOut, bufferSize);
-#ifdef __STEM__
-        } else {
+        const auto channelCount = m_pBuffer->getChannelCount();
+        const auto pLoadedTrack = m_pBuffer->getLoadedTrack();
+        const bool isStemTrack = pLoadedTrack && pLoadedTrack->hasStem();
+
+        if (isStemTrack && isPrimaryDeck()) {
             // Process multiple stereo channels (stems) and mix them together
             processStem(pOut, bufferSize);
+        } else if (!isStemTrack && channelCount == mixxx::audio::ChannelCount(6)) {
+            m_pBuffer->process(m_surroundBuffer.data(), bufferSize * 3);
+            SampleUtil::mixSurround51ToStereo(
+                    pOut,
+                    m_surroundBuffer.data(),
+                    bufferSize / mixxx::audio::ChannelCount::stereo());
+        } else if (channelCount <= mixxx::kEngineChannelOutputCount) {
+            // Process a single mono or stereo channel
+            m_pBuffer->process(pOut, bufferSize);
+        } else {
+            const std::size_t multichannelBufferSize =
+                    bufferSize * channelCount /
+                    mixxx::audio::ChannelCount::stereo();
+            m_pBuffer->process(m_surroundBuffer.data(), multichannelBufferSize);
+            SampleUtil::mixMultichannelToStereo(
+                    pOut,
+                    m_surroundBuffer.data(),
+                    bufferSize / mixxx::audio::ChannelCount::stereo(),
+                    channelCount);
+        }
+#else
+        const auto channelCount = m_pBuffer->getChannelCount();
+        if (channelCount == mixxx::audio::ChannelCount(6)) {
+            m_pBuffer->process(m_surroundBuffer.data(), bufferSize * 3);
+            SampleUtil::mixSurround51ToStereo(
+                    pOut,
+                    m_surroundBuffer.data(),
+                    bufferSize / mixxx::audio::ChannelCount::stereo());
+        } else if (channelCount > mixxx::audio::ChannelCount::stereo()) {
+            const std::size_t multichannelBufferSize =
+                    bufferSize * channelCount /
+                    mixxx::audio::ChannelCount::stereo();
+            m_pBuffer->process(m_surroundBuffer.data(), multichannelBufferSize);
+            SampleUtil::mixMultichannelToStereo(
+                    pOut,
+                    m_surroundBuffer.data(),
+                    bufferSize / mixxx::audio::ChannelCount::stereo(),
+                    channelCount);
+        } else {
+            m_pBuffer->process(pOut, bufferSize);
         }
 #endif
         m_pPregain->setSpeedAndScratching(m_pBuffer->getSpeed(), m_pBuffer->getScratching());
         m_bPassthroughWasActive = false;
     }
 
-    // Apply pregain
+    // Apply pregain to the stereo cue path
+    const CSAMPLE_GAIN oldGain = m_pPregain->getGain();
     m_pPregain->process(pOut, bufferSize);
+    const CSAMPLE_GAIN newGain = m_pPregain->getGain();
+
+    // Apply the same pregain to the surround buffer so the GAIN knob
+    // and vinyl speed emulation affect the HDMI surround output.
+    if (m_pBuffer->getChannelCount() == mixxx::audio::ChannelCount(6)) {
+        const std::size_t frameCount =
+                bufferSize / mixxx::audio::ChannelCount::stereo();
+        const std::size_t surroundSamples = frameCount * 6;
+        if (newGain != oldGain) {
+            // Ramp gain per frame across all 6 channels
+            const CSAMPLE_GAIN gainDelta =
+                    (newGain - oldGain) / static_cast<CSAMPLE_GAIN>(frameCount);
+            CSAMPLE* pSurround = m_surroundBuffer.data();
+            for (std::size_t frame = 0; frame < frameCount; ++frame) {
+                const CSAMPLE_GAIN frameGain =
+                        oldGain + gainDelta * static_cast<CSAMPLE_GAIN>(frame + 1);
+                const std::size_t base = frame * 6;
+                for (unsigned int ch = 0; ch < 6; ++ch) {
+                    pSurround[base + ch] *= frameGain;
+                }
+            }
+        } else {
+            SampleUtil::applyGain(
+                    m_surroundBuffer.data(), newGain, surroundSamples);
+        }
+    }
 
     EngineEffectsManager* pEngineEffectsManager = m_pEffectsManager->getEngineEffectsManager();
     if (pEngineEffectsManager != nullptr) {
@@ -272,6 +343,20 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
 
     // Update VU meter
     m_vuMeter.process(pOut, bufferSize);
+
+    if (m_pBuffer->getChannelCount() != mixxx::audio::ChannelCount(6)) {
+        m_surroundBuffer.clear(bufferSize * 3);
+        const std::size_t frameCount =
+                bufferSize / mixxx::audio::ChannelCount::stereo();
+        for (std::size_t frame = 0; frame < frameCount; ++frame) {
+            m_surroundBuffer[frame * 6] = pOut[frame * 2];
+            m_surroundBuffer[frame * 6 + 1] = pOut[frame * 2 + 1];
+        }
+    }
+}
+
+std::span<const CSAMPLE> EngineDeck::getSurroundBuffer() const {
+    return m_surroundBuffer.span();
 }
 
 void EngineDeck::collectFeatures(GroupFeatureState* pGroupFeatures) const {
@@ -306,6 +391,7 @@ EngineChannel::ActiveState EngineDeck::updateActiveState() {
     }
     if (m_active) {
         m_vuMeter.reset();
+        m_surroundBuffer.clear();
 #ifdef __STEM__
         for (auto& stemVuMeter : m_stemVuMeter) {
             stemVuMeter->reset();

@@ -57,7 +57,11 @@ Rectangle {
         {
             entity: "Record",
             channel: "Additional input"
-        } // RecordBroadcast,
+        },
+        {
+            entity: "Mixer",
+            channel: "Surround"
+        } // Surround,
         ,
     ]
     property Component connectionEdge: Qt.createComponent("AudioConnection.qml")
@@ -80,7 +84,7 @@ Rectangle {
             return;
         for (let connection of connections) {
             let typeDef = audioTypeMap[connection.type];
-            let source = root.system[typeDef.entity].gateways[typeDef.channel][connection.index].edgeItem;
+                let source = root.system[typeDef.entity].gateways[typeDef.channel][connection.index].edgeItem;
             let availableEdge = node.availableEdge();
             if (!source || availableEdge === null) {
                 console.error("Unable to get the source and sink of the existing connection!", source, availableEdge);
@@ -666,7 +670,6 @@ Rectangle {
     }
     AudioEntity {
         id: mixer
-
         advanced: root.mode == AudioRouter.Mode.Advanced
         gateways: [
             {
@@ -683,19 +686,31 @@ Rectangle {
                 type: "source"
             },
             {
-                name: "Left Bus",
+                name: "Crossfader Left Bus",
                 type: "source",
                 advanced: true
             },
             {
-                name: "Center Bus",
+                name: "Crossfader Center Bus",
                 type: "source",
                 advanced: true
             },
             {
-                name: "Right Bus",
+                name: "Crossfader Right Bus",
                 type: "source",
                 advanced: true
+            },
+            {
+                name: "Surround Front L/R",
+                type: "source"
+            },
+            {
+                name: "Surround Center/Sub",
+                type: "source"
+            },
+            {
+                name: "Surround L/R",
+                type: "source"
             },
             {
                 name: "Auxiliary",
@@ -727,8 +742,15 @@ Rectangle {
             }
             let nodeIdxOffset = 0;
             if (address.endsWith(" Bus")) {
-                nodeIdxOffset = address.startsWith("Left ") ? 0 : address.startsWith("Right ") ? 2 : 1;
+                nodeIdxOffset = address.startsWith("Crossfader Left ")
+                        ? 0
+                        : address.startsWith("Crossfader Right ") ? 2 : 1;
                 address = "Bus";
+            } else if (address.startsWith("Surround ")) {
+                nodeIdxOffset = address == "Surround Front L/R"
+                        ? 0
+                        : address == "Surround Center/Sub" ? 1 : 2;
+                address = "Surround";
             }
             console.log("register", address, nodeIdxOffset);
             if (!root.system["Mixer"].gateways[address]) {
