@@ -335,6 +335,8 @@ class SampleUtil {
             SINT numFrames,
             mixxx::audio::ChannelCount numChannels);
 
+    void mixSurround51ToStereo(CSAMPLE* pDest, const CSAMPLE* pSrc, SINT numFrames);
+
     // In-place doubles the mono samples in pBuffer to dual mono samples.
     // (numFrames) samples will be read from pBuffer
     // (numFrames * 2) samples will be written into pBuffer
