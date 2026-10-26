@@ -3,6 +3,7 @@
 #include <QScopedPointer>
 
 #include "engine/channels/enginechannel.h"
+#include "engine/engine.h"
 #include "preferences/usersettings.h"
 #include "soundio/soundmanagerutil.h"
 #include "track/track_decl.h"
@@ -97,7 +98,10 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     UserSettingsPointer m_pConfig;
     EngineBuffer* m_pBuffer;
     EnginePregain* m_pPregain;
+    // Fixed 5.1 output buffer used by getSurroundBuffer().
     mixxx::SampleBuffer m_surroundBuffer;
+    // Scratch buffer for decoding/mixing source tracks that can have more than 6 channels.
+    mixxx::SampleBuffer m_multichannelScratchBuffer;
 
 #ifdef __STEM__
     // Stem buffer used to retrieve all the channel to mix together

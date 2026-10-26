@@ -1,5 +1,7 @@
 #include "analyzer/analyzerkey.h"
 
+#include <exception>
+
 #include <QtDebug>
 
 #include "analyzer/analyzertrack.h"
@@ -109,7 +111,15 @@ bool AnalyzerKey::initialize(const AnalyzerTrack& track,
         }
 
         if (m_pPlugin) {
-            if (m_pPlugin->initialize(mixxx::audio::SampleRate(m_sampleRate))) {
+            bool initialized = false;
+            try {
+                initialized = m_pPlugin->initialize(mixxx::audio::SampleRate(m_sampleRate));
+            } catch (const std::exception& e) {
+                qWarning() << "Key plugin initialize failed with exception:" << e.what();
+            } catch (...) {
+                qWarning() << "Key plugin initialize failed with unknown exception";
+            }
+            if (initialized) {
                 qDebug() << "Key calculation started with plugin" << m_pluginId;
             } else {
                 qDebug() << "Key calculation will not start.";
@@ -201,7 +211,16 @@ bool AnalyzerKey::processSamples(const CSAMPLE* pIn, SINT count) {
         return false;
     }
 
-    bool ret = m_pPlugin->processSamples(pKeyInput, count);
+    bool ret = false;
+    try {
+        ret = m_pPlugin->processSamples(pKeyInput, count);
+    } catch (const std::exception& e) {
+        qWarning() << "Key plugin processSamples failed with exception:" << e.what();
+        m_pPlugin.reset();
+    } catch (...) {
+        qWarning() << "Key plugin processSamples failed with unknown exception";
+        m_pPlugin.reset();
+    }
     if (pHarmonicMixedChannel) {
         SampleUtil::free(pHarmonicMixedChannel);
     }
@@ -217,12 +236,31 @@ void AnalyzerKey::storeResults(TrackPointer tio) {
         return;
     }
 
-    if (!m_pPlugin->finalize()) {
+    bool finalized = false;
+    try {
+        finalized = m_pPlugin->finalize();
+    } catch (const std::exception& e) {
+        qWarning() << "Key plugin finalize failed with exception:" << e.what();
+        return;
+    } catch (...) {
+        qWarning() << "Key plugin finalize failed with unknown exception";
+        return;
+    }
+    if (!finalized) {
         qWarning() << "Key detection failed";
         return;
     }
 
-    KeyChangeList key_changes = m_pPlugin->getKeyChanges();
+    KeyChangeList key_changes;
+    try {
+        key_changes = m_pPlugin->getKeyChanges();
+    } catch (const std::exception& e) {
+        qWarning() << "Key plugin getKeyChanges failed with exception:" << e.what();
+        return;
+    } catch (...) {
+        qWarning() << "Key plugin getKeyChanges failed with unknown exception";
+        return;
+    }
     QHash<QString, QString> extraVersionInfo = getExtraVersionInfo(
             m_pluginId, m_bPreferencesFastAnalysisEnabled);
     Keys track_keys = KeyFactory::makePreferredKeys(
