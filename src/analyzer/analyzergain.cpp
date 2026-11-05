@@ -58,8 +58,14 @@ bool AnalyzerGain::processSamples(const CSAMPLE* pIn, SINT count) {
         SampleUtil::mixMultichannelToStereo(pMixedChannel, pIn, numFrames, m_channelCount);
         pGainInput = pMixedChannel;
     } else if (m_channelCount > mixxx::audio::ChannelCount::stereo()) {
-        DEBUG_ASSERT(!"Unsupported channel count");
-        return false;
+        // For generic multichannel input (e.g. 5.1), analyze the front L/R pair.
+        count = numFrames * mixxx::audio::ChannelCount::stereo();
+        pMixedChannel = SampleUtil::alloc(count);
+        VERIFY_OR_DEBUG_ASSERT(pMixedChannel) {
+            return false;
+        }
+        SampleUtil::copyOneStereoFromMulti(pMixedChannel, pIn, numFrames, m_channelCount, 0);
+        pGainInput = pMixedChannel;
     }
 
     if (numFrames > static_cast<SINT>(m_pLeftTempBuffer.size())) {

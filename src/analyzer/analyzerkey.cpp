@@ -207,8 +207,15 @@ bool AnalyzerKey::processSamples(const CSAMPLE* pIn, SINT count) {
 
         pKeyInput = pHarmonicMixedChannel;
     } else if (m_channelCount > mixxx::audio::ChannelCount::stereo()) {
-        DEBUG_ASSERT(!"Unsupported channel count");
-        return false;
+        // For generic multichannel input (e.g. 5.1), analyze the front L/R pair.
+        count = numFrames * mixxx::audio::ChannelCount::stereo();
+        pHarmonicMixedChannel = SampleUtil::alloc(count);
+        VERIFY_OR_DEBUG_ASSERT(pHarmonicMixedChannel) {
+            return false;
+        }
+        SampleUtil::copyOneStereoFromMulti(
+                pHarmonicMixedChannel, pIn, numFrames, m_channelCount, 0);
+        pKeyInput = pHarmonicMixedChannel;
     }
 
     bool ret = false;

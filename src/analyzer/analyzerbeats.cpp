@@ -237,7 +237,7 @@ bool AnalyzerBeats::processSamples(const CSAMPLE* pIn, SINT count) {
 
         pBeatInput = pDrumChannel;
     } else if (m_channelCount > mixxx::audio::ChannelCount::stereo()) {
-        // For generic multichannel input, analyze the stereo downmix.
+        // For generic multichannel input (e.g. 5.1), analyze the front L/R pair.
         count = numFrames * mixxx::audio::ChannelCount::stereo();
         pDrumChannel = SampleUtil::alloc(count);
 
@@ -245,12 +245,15 @@ bool AnalyzerBeats::processSamples(const CSAMPLE* pIn, SINT count) {
             return false;
         }
 
-        SampleUtil::mixMultichannelToStereo(pDrumChannel, pIn, numFrames, m_channelCount);
+        SampleUtil::copyOneStereoFromMulti(pDrumChannel, pIn, numFrames, m_channelCount, 0);
         pBeatInput = pDrumChannel;
     }
 
     m_currentFrame += numFrames;
     if (m_currentFrame > m_maxFramesToProcess) {
+        if (pDrumChannel) {
+            SampleUtil::free(pDrumChannel);
+        }
         return true; // silently ignore all remaining samples
     }
 
