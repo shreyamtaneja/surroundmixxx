@@ -154,6 +154,7 @@ QString KeyComparisonEffect::getId() {
 EffectManifestPointer KeyComparisonEffect::getManifest() {
     auto pManifest = EffectManifestPointer::create();
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Key Comparison"));
     pManifest->setAuthor(QObject::tr("The Mixxx Team"));
     pManifest->setVersion(QStringLiteral("1.0"));

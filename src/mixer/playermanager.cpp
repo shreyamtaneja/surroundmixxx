@@ -396,6 +396,15 @@ void PlayerManager::addDeckInner() {
     }
 #endif
 
+    // Extra effect handles so each surround pair has its own EQ/QuickFX/FX state,
+    // separate from the deck handle used by the stereo path.
+    for (int pair = 0; pair < EngineDeck::kSurroundPairCount; pair++) {
+        ChannelHandleAndGroup pairHandleGroup = m_pEngine->registerChannelGroup(
+                groupForDeckSurroundPair(deckIndex, pair));
+        pDeck->getEngineDeck()->addSurroundPairHandle(pairHandleGroup);
+        m_pEffectsManager->addSurroundPair(handleGroup, pairHandleGroup);
+    }
+
     // Setup EQ ControlProxies used for resetting EQs on track load
     pDeck->setupEqControls();
 }

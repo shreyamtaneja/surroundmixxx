@@ -65,6 +65,12 @@ void EnginePregain::setSpeedAndScratching(double speed, bool scratching) {
 }
 
 void EnginePregain::process(CSAMPLE* pInOut, const std::size_t bufferSize) {
+    process(pInOut, bufferSize, 2);
+}
+
+void EnginePregain::process(CSAMPLE* pInOut,
+        const std::size_t bufferSize,
+        const std::size_t channelCount) {
     const auto fReplayGain = static_cast<CSAMPLE_GAIN>(m_pCOReplayGain->get());
     CSAMPLE_GAIN fReplayGainCorrection;
     if (!s_pEnableReplayGain->toBool() || m_pPassthroughEnabled->toBool()) {
@@ -148,8 +154,10 @@ void EnginePregain::process(CSAMPLE* pInOut, const std::size_t bufferSize) {
 
     if ((m_dSpeed * m_dOldSpeed < 0) && m_scratching) {
         // direction changed, go though zero if scratching
-        SampleUtil::applyRampingGain(&pInOut[0], m_fPrevGain, 0, bufferSize / 2);
-        SampleUtil::applyRampingGain(&pInOut[bufferSize / 2], 0, totalGain, bufferSize / 2);
+        // Split on a frame boundary
+        const std::size_t firstHalf = (bufferSize / 2) / channelCount * channelCount;
+        SampleUtil::applyRampingGain(&pInOut[0], m_fPrevGain, 0, firstHalf);
+        SampleUtil::applyRampingGain(&pInOut[firstHalf], 0, totalGain, bufferSize - firstHalf);
     } else if (totalGain != m_fPrevGain) {
         // Prevent sound wave discontinuities by interpolating from old to new gain
         // if not stopped or starting

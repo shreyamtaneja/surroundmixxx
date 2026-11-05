@@ -24,6 +24,7 @@ QString FlangerEffect::getId() {
 EffectManifestPointer FlangerEffect::getManifest() {
     EffectManifestPointer pManifest(new EffectManifest());
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Flanger"));
     pManifest->setShortName(QObject::tr("Flanger"));
     pManifest->setAuthor("The Mixxx Team");

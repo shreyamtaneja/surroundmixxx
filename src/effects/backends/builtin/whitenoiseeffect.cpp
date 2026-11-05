@@ -17,6 +17,7 @@ QString WhiteNoiseEffect::getId() {
 EffectManifestPointer WhiteNoiseEffect::getManifest() {
     EffectManifestPointer pManifest(new EffectManifest());
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("White Noise"));
     pManifest->setAuthor("The Mixxx Team");
     pManifest->setVersion("1.0");

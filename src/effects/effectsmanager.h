@@ -3,6 +3,8 @@
 #include <QHash>
 #include <QList>
 #include <QSet>
+#include <utility>
+#include <vector>
 
 #include "control/controlpotmeter.h"
 #include "effects/backends/effectsbackendmanager.h"
@@ -28,6 +30,13 @@ class EffectsManager {
     void setup();
     void addDeck(const ChannelHandleAndGroup& deckHandleGroup);
     void addStem(const ChannelHandleAndGroup& stemHandleGroup);
+    // Registers an extra input channel carrying one stereo pair of a
+    // multichannel deck and mirrors the deck's EQ and QuickEffect chains onto it.
+    void addSurroundPair(const ChannelHandleAndGroup& deckHandleGroup,
+            const ChannelHandleAndGroup& pairHandleGroup);
+    // Registers one stereo pair of the surround main mix with the main
+    // output effect chain.
+    void addOutputSurroundPair(const ChannelHandleAndGroup& pairHandleGroup);
     void resetStemQuickFxKnob(const ChannelHandleAndGroup& stemHandleGroup);
 
     void loadDefaultEqsAndQuickEffects();
@@ -99,6 +108,8 @@ class EffectsManager {
     QHash<QString, EffectChainPointer> m_effectChainSlotsByGroup;
 
     QList<StandardEffectChainPointer> m_standardEffectChains;
+    std::vector<std::pair<ChannelHandleAndGroup, ChannelHandleAndGroup>> m_surroundPairLinks;
+    std::vector<ChannelHandleAndGroup> m_outputSurroundPairs;
     OutputEffectChainPointer m_outputEffectChain;
     // These two store <deck group, effect chain pointer>
     QHash<QString, EqualizerEffectChainPointer> m_equalizerEffectChains;

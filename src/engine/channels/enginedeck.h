@@ -28,6 +28,12 @@ class EngineDeck : public EngineChannel, public AudioDestination {
 
     void process(CSAMPLE* pOutput, const std::size_t bufferSize) override;
     std::span<const CSAMPLE> getSurroundBuffer() const override;
+    int getSurroundPairCount() const override {
+        return m_surroundActivePairs;
+    }
+    std::span<const ChannelHandleAndGroup> getSurroundPairHandles() const override {
+        return m_surroundPairs;
+    }
     void collectFeatures(GroupFeatureState* pGroupFeatures) const override;
 
     // postProcessLocalBpm() is called on all decks to update the localBpm after
@@ -75,6 +81,13 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     static QString getGroupForStem(QStringView deckGroup, int stemIdx);
 #endif
 
+    // A 5.1 deck is processed as three stereo pairs (L/R, C/LFE, Ls/Rs).
+    static constexpr int kSurroundPairCount = 3;
+    static constexpr int kSurroundChannelCount = kSurroundPairCount * 2;
+
+    // Registers the effect handles of the surround pairs, in pair order.
+    void addSurroundPairHandle(const ChannelHandleAndGroup& pairHandleGroup);
+
   signals:
     void noPassthroughInputConfigured();
 
@@ -90,6 +103,14 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     // Process multiple channels and mix them together into the passed buffer
     void processStem(CSAMPLE* pOutput, const std::size_t bufferSize);
 #endif
+
+    // Decodes, applies pregain and per-pair EQ/QuickFX on the 6 channel buffer
+    // and downmixes the result into pOutput.
+    void processSurround(CSAMPLE* pOutput, const std::size_t bufferSize);
+
+    std::vector<ChannelHandleAndGroup> m_surroundPairs;
+    int m_surroundActivePairs = 1;
+    mixxx::SampleBuffer m_pairBuffer;
 
     std::vector<ChannelHandleAndGroup> m_stems;
     std::vector<CSAMPLE_GAIN> m_stemsGainCache;

@@ -22,6 +22,10 @@ const QString SoundManagerConfig::kAPIDirectSound = QStringLiteral("Windows Dire
 const QString SoundManagerConfig::kAPIIosAudio = QStringLiteral("iOS Audio");
 const QString SoundManagerConfig::kAPICoreAudio = QStringLiteral("Core Audio");
 const QString SoundManagerConfig::kAPIPipewire = QStringLiteral("PipeWire");
+const QString SoundManagerConfig::kAPIWasapiLegacy = QStringLiteral("Windows WASAPI");
+const QString SoundManagerConfig::kAPIWasapiShared = QStringLiteral("Windows WASAPI (Shared)");
+const QString SoundManagerConfig::kAPIWasapiExclusive =
+        QStringLiteral("Windows WASAPI (Exclusive)");
 
 const QString SoundManagerConfig::kEmptyComboBox = QStringLiteral("---");
 const unsigned int SoundManagerConfig::kDefaultDeckCount = 2;
@@ -306,7 +310,8 @@ QString SoundManagerConfig::getAPI() const {
 void SoundManagerConfig::setAPI(const QString &api) {
     // SoundManagerConfig doesn't necessarily have access to a SoundManager
     // instance, so I can't check for input validity here -- bkgood
-    m_api = api;
+    // Settings saved before the shared/exclusive split used PortAudio's name.
+    m_api = (api == kAPIWasapiLegacy) ? kAPIWasapiShared : api;
 }
 
 /**

@@ -6,7 +6,8 @@
 class ReadAheadManager;
 
 /** Number of samples to read ahead */
-constexpr int kiLinearScaleReadAheadLength = 10240;
+// Must be a multiple of the supported channel counts (2, 6, 8).
+constexpr int kiLinearScaleReadAheadLength = 10248;
 
 class EngineBufferScaleLinear : public EngineBufferScale  {
     Q_OBJECT

@@ -170,6 +170,13 @@ class PlayerManager : public PlayerManagerInterface {
     }
 #endif
 
+    // Returns the group for the deck and surround pair (zero based indices).
+    static QString groupForDeckSurroundPair(int deckIdx, int pairIdx) {
+        DEBUG_ASSERT(deckIdx >= 0 && pairIdx >= 0);
+        return QStringLiteral("[Channel") + QString::number(deckIdx + 1) +
+                QStringLiteral("_Surround") + QChar('1' + pairIdx) + QChar(']');
+    }
+
     // Returns the group for the ith PreviewDeck where i is zero indexed
     static QString groupForPreviewDeck(int i) {
         DEBUG_ASSERT(i >= 0);

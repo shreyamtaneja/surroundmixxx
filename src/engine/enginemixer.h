@@ -6,6 +6,7 @@
 #include <atomic>
 #include <gsl/pointers>
 #include <memory>
+#include <vector>
 
 #include "audio/types.h"
 #include "control/controlobject.h"
@@ -264,6 +265,9 @@ class EngineMixer : public QObject, public AudioSource {
 
     ChannelHandleFactoryPointer m_pChannelHandleFactory;
     void applyMainEffects(std::size_t bufferSize);
+    // Post-mix stage of the surround path: main effects, ducking, mic (center
+    // channel), main gain, main output effects and balance.
+    void processSurroundMain(std::size_t bufferSize);
     void processHeadphones(
             const CSAMPLE_GAIN mainMixGainInHeadphones,
             std::size_t bufferSize);
@@ -277,6 +281,23 @@ class EngineMixer : public QObject, public AudioSource {
     QVarLengthArray<GainCache, kPreallocatedChannels> m_channelMainGainCache;
     QVarLengthArray<GainCache, kPreallocatedChannels> m_channelHeadphoneGainCache;
     QVarLengthArray<GainCache, kPreallocatedChannels> m_channelTalkoverGainCache;
+
+    // Per-channel state of the surround mix: previous gain for each of the 3
+    // stereo pairs, and whether the channel must fade out of the surround mix.
+    struct SurroundGainCache {
+        std::array<CSAMPLE_GAIN, 3> m_gain = {0, 0, 0};
+        bool m_fadeout = false;
+    };
+    QVarLengthArray<SurroundGainCache, kPreallocatedChannels> m_channelSurroundGainCache;
+    mixxx::SampleBuffer m_surroundPairScratch;
+    CSAMPLE_GAIN m_surroundMainGainOld;
+    CSAMPLE_GAIN m_surroundDuckingGainOld;
+    CSAMPLE_GAIN m_surroundBalLeftOld;
+    CSAMPLE_GAIN m_surroundBalRightOld;
+    // Effect input handles for the main mix and the main output chain, one per
+    // surround stereo pair.
+    std::vector<ChannelHandleAndGroup> m_mainSurroundHandles;
+    std::vector<ChannelHandleAndGroup> m_mainOutputSurroundHandles;
 
     // Pre-allocated buffers for performing channel mixing in the callback.
     QVarLengthArray<ChannelInfo*, kPreallocatedChannels> m_activeChannels;

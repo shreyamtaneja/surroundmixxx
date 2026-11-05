@@ -21,7 +21,8 @@ class SoundDevicePortAudio : public SoundDevice {
             SoundManager* sm,
             const PaDeviceInfo* deviceInfo,
             PaHostApiTypeId deviceTypeId,
-            unsigned int devIndex);
+            unsigned int devIndex,
+            bool wasapiExclusive = false);
     ~SoundDevicePortAudio() override;
 
     SoundDeviceStatus open(bool isClkRefDevice, int syncBuffers) override;
@@ -70,6 +71,7 @@ class SoundDevicePortAudio : public SoundDevice {
     // belongs to PortAudio.
     const PaDeviceInfo* m_deviceInfo;
     const PaHostApiTypeId m_deviceTypeId;
+    const bool m_wasapiExclusive;
     // Description of the output stream going to the soundcard.
     PaStreamParameters m_outputParams;
     // Description of the input stream coming from the soundcard.

@@ -93,9 +93,13 @@ double EngineBufferScaleLinear::scaleBuffer(
         // the other way.
 
         // first half: rate goes from old rate to zero
+        // Split on a frame boundary so it works for any channel count.
+        const SINT frameOffset = getOutputSignal().samples2frames(iOutputBufferSize) / 2;
+        const SINT sampleOffset = getOutputSignal().frames2samples(frameOffset);
+
         m_dOldRate = rate_add_old;
         m_dRate = 0.0;
-        frames_read += do_scale(pOutputBuffer, getOutputSignal().samples2frames(iOutputBufferSize));
+        frames_read += do_scale(pOutputBuffer, sampleOffset);
 
         // reset m_floorSampleOld in a way as we were coming from
         // the other direction
@@ -133,8 +137,6 @@ double EngineBufferScaleLinear::scaleBuffer(
         m_dOldRate = 0.0;
         m_dRate = rate_add_new;
         // pass the address of the frame at the halfway point
-        SINT frameOffset =  getOutputSignal().samples2frames(iOutputBufferSize) / 2;
-        SINT sampleOffset = getOutputSignal().frames2samples(frameOffset);
         frames_read += do_scale(pOutputBuffer + sampleOffset, iOutputBufferSize - sampleOffset);
     } else {
         frames_read += do_scale(pOutputBuffer, iOutputBufferSize);

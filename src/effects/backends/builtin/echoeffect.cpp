@@ -129,7 +129,9 @@ void EchoEffect::processChannel(
     double period = m_pDelayParameter->value();
     const auto send_current = static_cast<CSAMPLE_GAIN>(m_pSendParameter->value());
     const auto feedback_current = static_cast<CSAMPLE_GAIN>(m_pFeedbackParameter->value());
-    const auto pingpong_frac = static_cast<CSAMPLE_GAIN>(m_pPingPongParameter->value());
+    const auto pingpong_frac = groupFeatures.isCenterLfe
+            ? 0.0f
+            : static_cast<CSAMPLE_GAIN>(m_pPingPongParameter->value());
 
     double delay_seconds;
     if (groupFeatures.beat_length.has_value()) {

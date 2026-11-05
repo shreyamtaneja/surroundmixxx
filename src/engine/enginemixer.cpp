@@ -208,6 +208,20 @@ EngineMixer::EngineMixer(UserSettingsPointer pConfig,
     for (auto& buffer : m_surroundOutputBuffers) {
         buffer.clear();
     }
+    m_surroundPairScratch = mixxx::SampleBuffer(kMaxEngineSamples);
+    m_surroundPairScratch.clear();
+    m_surroundMainGainOld = 0.0f;
+    m_surroundDuckingGainOld = 1.0f;
+    m_surroundBalLeftOld = 1.0f;
+    m_surroundBalRightOld = 1.0f;
+    for (int pair = 0; pair < 3; ++pair) {
+        m_mainSurroundHandles.push_back(registerChannelGroup(
+                QStringLiteral("%1Surround%2").arg(group).arg(pair + 1)));
+        m_mainOutputSurroundHandles.push_back(registerChannelGroup(
+                QStringLiteral("[MasterOutputSurround%1]").arg(pair + 1)));
+        pEffectsManager->addSurroundPair(m_mainHandle, m_mainSurroundHandles.back());
+        pEffectsManager->addOutputSurroundPair(m_mainOutputSurroundHandles.back());
+    }
 
     // X-Fader Setup
     m_pXFaderMode->setButtonMode(mixxx::control::ButtonMode::Toggle);
@@ -269,6 +283,7 @@ void EngineMixer::processChannels(std::size_t bufferSize) {
             continue;
         }
 
+        bool inSurroundMix = false;
         if (pChannel->isTalkoverEnabled() &&
                 !pChannelInfo->m_pMuteControl->toBool()) {
             // talkover is an exclusive channel
@@ -293,7 +308,7 @@ void EngineMixer::processChannels(std::size_t bufferSize) {
                     !pChannelInfo->m_pMuteControl->toBool()) {
                 // the xFader-Mix
                 m_activeBusChannels[pChannel->getOrientation()].append(pChannelInfo);
-                m_activeSurroundChannels.append(pChannelInfo);
+                inSurroundMix = true;
             } else {
                 // Check if we need to fade out the channel
                 GainCache& gainCache = m_channelMainGainCache[i];
@@ -302,6 +317,17 @@ void EngineMixer::processChannels(std::size_t bufferSize) {
                     m_activeBusChannels[pChannel->getOrientation()].append(pChannelInfo);
                 }
             }
+        }
+
+        // Channels leaving the surround mix stay in the list until their gain
+        // has been ramped to zero.
+        SurroundGainCache& surroundCache = m_channelSurroundGainCache[i];
+        surroundCache.m_fadeout = !inSurroundMix;
+        if (inSurroundMix ||
+                std::any_of(surroundCache.m_gain.begin(),
+                        surroundCache.m_gain.end(),
+                        [](CSAMPLE_GAIN gain) { return gain != 0; })) {
+            m_activeSurroundChannels.append(pChannelInfo);
         }
 
         // If the channel is enabled for previewing in headphones, copy it
@@ -405,21 +431,47 @@ void EngineMixer::process(const std::size_t bufferSize) {
         surroundBuffer.clear(bufferSize);
     }
     for (ChannelInfo* pChannelInfo : std::as_const(m_activeSurroundChannels)) {
-        const auto source = pChannelInfo->m_pChannel->getSurroundBuffer();
+        EngineChannel* pChannel = pChannelInfo->m_pChannel.get();
+        const auto source = pChannel->getSurroundBuffer();
         if (source.size() < static_cast<std::size_t>(iFrames) * 6) {
             continue;
         }
-        const CSAMPLE_GAIN gain = m_mainGain.getGain(pChannelInfo);
-        for (unsigned int frame = 0; frame < iFrames; ++frame) {
-            const std::size_t sourceFrame = frame * 6;
-            const std::size_t outputFrame = frame * 2;
-            for (unsigned int pair = 0; pair < m_surroundOutputBuffers.size(); ++pair) {
-                CSAMPLE* output = m_surroundOutputBuffers[pair].data();
-                output[outputFrame] += source[sourceFrame + pair * 2] * gain;
-                output[outputFrame + 1] += source[sourceFrame + pair * 2 + 1] * gain;
+        SurroundGainCache& gainCache = m_channelSurroundGainCache[pChannelInfo->m_index];
+        const bool fadeout = gainCache.m_fadeout || !pChannel->isActive();
+        const CSAMPLE_GAIN newGain = fadeout ? 0 : m_mainGain.getGain(pChannelInfo);
+        const int pairCount = std::min<int>(pChannel->getSurroundPairCount(),
+                static_cast<int>(m_surroundOutputBuffers.size()));
+        const auto pairHandles = pChannel->getSurroundPairHandles();
+        CSAMPLE* pScratch = m_surroundPairScratch.data();
+
+        for (int pair = 0; pair < pairCount; ++pair) {
+            for (unsigned int frame = 0; frame < iFrames; ++frame) {
+                pScratch[frame * 2] = source[frame * 6 + pair * 2];
+                pScratch[frame * 2 + 1] = source[frame * 6 + pair * 2 + 1];
             }
+            const CSAMPLE_GAIN oldGain = gainCache.m_gain[pair];
+            if (m_pEngineEffectsManager &&
+                    static_cast<std::size_t>(pair) < pairHandles.size()) {
+                m_pEngineEffectsManager->processPostFaderInPlace(
+                        pairHandles[pair].handle(),
+                        m_mainHandle.handle(),
+                        pScratch,
+                        bufferSize,
+                        m_sampleRate,
+                        pChannelInfo->m_features,
+                        oldGain,
+                        newGain,
+                        fadeout);
+            } else {
+                SampleUtil::applyRampingGain(pScratch, oldGain, newGain, bufferSize);
+            }
+            SampleUtil::add(m_surroundOutputBuffers[pair].data(), pScratch, bufferSize);
+            gainCache.m_gain[pair] = newGain;
         }
     }
+
+    // Main gain, main effects, talkover and balance are applied in
+    // processSurroundMain() once the stereo main mix has been processed.
 
     // Compute headphone mix
     // Head phone left/right mix
@@ -815,6 +867,8 @@ void EngineMixer::process(const std::size_t bufferSize) {
         m_main.clear(bufferSize);
         m_booth.clear(bufferSize);
     }
+    processSurroundMain(bufferSize);
+
     if (headphoneEnabled) {
         m_pHeadDelay->process(m_head.data(), bufferSize);
     }
@@ -822,6 +876,93 @@ void EngineMixer::process(const std::size_t bufferSize) {
     // We're close to the end of the callback. Wake up the engine worker
     // scheduler so that it runs the workers.
     m_pWorkerScheduler->runWorkers();
+}
+
+void EngineMixer::processSurroundMain(std::size_t bufferSize) {
+    const std::size_t pairCount = m_surroundOutputBuffers.size();
+    GroupFeatureState mainFeatures;
+    mainFeatures.gain = m_pMainGain->get();
+
+    // Main effects (FX units assigned to the main mix)
+    if (m_pEngineEffectsManager) {
+        for (std::size_t pair = 0; pair < pairCount; ++pair) {
+            GroupFeatureState features = mainFeatures;
+            features.isCenterLfe = (pair == 1);
+            m_pEngineEffectsManager->processPostFaderInPlace(
+                    m_mainSurroundHandles[pair].handle(),
+                    m_mainHandle.handle(),
+                    m_surroundOutputBuffers[pair].data(),
+                    bufferSize,
+                    m_sampleRate,
+                    features,
+                    CSAMPLE_GAIN_ONE,
+                    CSAMPLE_GAIN_ONE);
+        }
+    }
+
+    // Ducking. m_duckingGainOld holds the gain computed for this callback by
+    // the stereo path, and the ducking state must only be advanced once.
+    const CSAMPLE_GAIN duckingGain = m_duckingGainOld;
+    for (auto& buffer : m_surroundOutputBuffers) {
+        SampleUtil::applyRampingGain(
+                buffer.data(), m_surroundDuckingGainOld, duckingGain, bufferSize);
+    }
+    m_surroundDuckingGainOld = duckingGain;
+
+    // Mic/talkover: mono mix into the center channel. With direct monitoring
+    // the mic is mixed in hardware.
+    const auto micMonitorMode = static_cast<MicMonitorMode>(
+            static_cast<int>(m_pMicMonitorMode->get()));
+    if (m_numMicsConfigured > 0 && micMonitorMode != MicMonitorMode::DirectMonitor) {
+        CSAMPLE* pCenterLfe = m_surroundOutputBuffers[1].data();
+        const CSAMPLE* pTalkover = m_talkover.data();
+        for (std::size_t i = 0; i + 1 < bufferSize; i += 2) {
+            pCenterLfe[i] += (pTalkover[i] + pTalkover[i + 1]) * 0.5f;
+        }
+    }
+
+    // Main gain
+    const auto mainGain = static_cast<CSAMPLE_GAIN>(m_pMainGain->get());
+    for (auto& buffer : m_surroundOutputBuffers) {
+        SampleUtil::applyRampingGain(
+                buffer.data(), m_surroundMainGainOld, mainGain, bufferSize);
+    }
+    m_surroundMainGainOld = mainGain;
+
+    // Effects for the main hardware output only
+    if (m_pEngineEffectsManager) {
+        for (std::size_t pair = 0; pair < pairCount; ++pair) {
+            GroupFeatureState features = mainFeatures;
+            features.isCenterLfe = (pair == 1);
+            m_pEngineEffectsManager->processPostFaderInPlace(
+                    m_mainOutputSurroundHandles[pair].handle(),
+                    m_mainHandle.handle(),
+                    m_surroundOutputBuffers[pair].data(),
+                    bufferSize,
+                    m_sampleRate,
+                    features);
+        }
+    }
+
+    // Balance applies to the front and surround pairs, not to center/LFE.
+    CSAMPLE balright = 1.;
+    CSAMPLE balleft = 1.;
+    const auto bal = static_cast<CSAMPLE_GAIN>(m_pBalance->get());
+    if (bal > 0.) {
+        balleft -= bal;
+    } else if (bal < 0.) {
+        balright += bal;
+    }
+    for (std::size_t pair = 0; pair < pairCount; pair += 2) {
+        SampleUtil::applyRampingAlternatingGain(m_surroundOutputBuffers[pair].data(),
+                balleft,
+                balright,
+                m_surroundBalLeftOld,
+                m_surroundBalRightOld,
+                bufferSize);
+    }
+    m_surroundBalLeftOld = balleft;
+    m_surroundBalRightOld = balright;
 }
 
 void EngineMixer::applyMainEffects(std::size_t bufferSize) {
@@ -900,6 +1041,7 @@ void EngineMixer::addChannel(std::unique_ptr<EngineChannel> pChannel) {
     m_channelHeadphoneGainCache.append(gainCacheDefault);
     m_channelTalkoverGainCache.append(gainCacheDefault);
     m_channelMainGainCache.append(gainCacheDefault);
+    m_channelSurroundGainCache.append(SurroundGainCache{});
 
     // Pre-allocate scratch buffers to avoid memory allocation in the
     // callback. QVarLengthArray does nothing if reserve is called with a size

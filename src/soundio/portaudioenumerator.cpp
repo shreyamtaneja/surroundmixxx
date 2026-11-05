@@ -251,6 +251,10 @@ void PortAudioEnumerator::initialize() {
         auto currentDevice = QSharedPointer<SoundDevicePortAudio>::create(
                 m_pConfig, m_pSoundManager, deviceInfo, deviceTypeId, i);
         m_devices.push_back(currentDevice);
+        if (deviceTypeId == paWASAPI) {
+            m_devices.push_back(QSharedPointer<SoundDevicePortAudio>::create(
+                    m_pConfig, m_pSoundManager, deviceInfo, deviceTypeId, i, true));
+        }
         if (Pa_GetHostApiInfo(deviceInfo->hostApi)->name == SoundManagerConfig::kAPIJack) {
             m_jackSampleRate = static_cast<mixxx::audio::SampleRate::value_t>(
                     deviceInfo->defaultSampleRate);
@@ -260,7 +264,12 @@ void PortAudioEnumerator::initialize() {
     for (PaHostApiIndex i = 0; i < Pa_GetHostApiCount(); i++) {
         const PaHostApiInfo* api = Pa_GetHostApiInfo(i);
         if (api && std::strcmp(api->name, "skeleton implementation")) {
-            m_apis.push_back(api->name);
+            if (api->type == paWASAPI) {
+                m_apis.push_back(SoundManagerConfig::kAPIWasapiShared);
+                m_apis.push_back(SoundManagerConfig::kAPIWasapiExclusive);
+            } else {
+                m_apis.push_back(api->name);
+            }
         }
     }
 }

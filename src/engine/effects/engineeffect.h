@@ -68,6 +68,7 @@ class EngineEffect final : public EffectsRequestHandler {
     std::unique_ptr<EffectProcessor> m_pProcessor;
     ChannelHandleMap<ChannelHandleMap<EffectEnableState>> m_effectEnableStateForChannelMatrix;
     bool m_effectRampsFromDry;
+    bool m_bypassOnCenterLfe = false;
     // Must not be modified after construction.
     QVector<EngineEffectParameterPointer> m_parameters;
     QMap<QString, EngineEffectParameterPointer> m_parametersById;

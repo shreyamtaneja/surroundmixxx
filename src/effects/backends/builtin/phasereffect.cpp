@@ -18,6 +18,7 @@ QString PhaserEffect::getId() {
 EffectManifestPointer PhaserEffect::getManifest() {
     EffectManifestPointer pManifest(new EffectManifest());
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Phaser"));
     pManifest->setShortName(QObject::tr("Phaser"));
     pManifest->setAuthor("The Mixxx Team");

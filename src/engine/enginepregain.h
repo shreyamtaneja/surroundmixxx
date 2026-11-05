@@ -24,6 +24,8 @@ class EnginePregain : public EngineObject {
     void setSpeedAndScratching(double speed, bool scratching);
 
     void process(CSAMPLE* pInOut, const std::size_t bufferSize) override;
+    // Same as above for interleaved buffers with an arbitrary channel count.
+    void process(CSAMPLE* pInOut, const std::size_t bufferSize, const std::size_t channelCount);
 
     void collectFeatures(GroupFeatureState* pGroupFeatures) const override;
 

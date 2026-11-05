@@ -85,6 +85,7 @@ QString MetronomeEffect::getId() {
 EffectManifestPointer MetronomeEffect::getManifest() {
     auto pManifest = EffectManifestPointer::create();
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Metronome"));
     pManifest->setAuthor(QObject::tr("The Mixxx Team"));
     pManifest->setVersion(QStringLiteral("1.0"));

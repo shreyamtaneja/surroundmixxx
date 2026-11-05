@@ -18,6 +18,7 @@ QString BalanceEffect::getId() {
 EffectManifestPointer BalanceEffect::getManifest() {
     EffectManifestPointer pManifest(new EffectManifest());
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Stereo Balance"));
     pManifest->setShortName(QObject::tr("Balance"));
     pManifest->setAuthor("The Mixxx Team");

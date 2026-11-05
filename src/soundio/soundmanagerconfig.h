@@ -62,6 +62,11 @@ class SoundManagerConfig {
     static const QString kAPIIosAudio;
     static const QString kAPICoreAudio;
     static const QString kAPIPipewire;
+    // PortAudio's WASAPI host API is exposed as two selectable APIs.
+    // kAPIWasapiLegacy is the name PortAudio reports and older settings stored.
+    static const QString kAPIWasapiLegacy;
+    static const QString kAPIWasapiShared;
+    static const QString kAPIWasapiExclusive;
 
     /// The default sample rate that Mixxx uses.
     static constexpr mixxx::audio::SampleRate kMixxxDefaultSampleRate =

@@ -445,6 +445,27 @@ void EffectChain::enableForInputChannel(const ChannelHandleAndGroup& handleGroup
     m_enabledInputChannels.insert(handleGroup);
 }
 
+void EffectChain::linkInputChannel(const ChannelHandleAndGroup& deckHandleGroup,
+        const ChannelHandleAndGroup& pairHandleGroup) {
+    auto pDeckEnable = m_channelEnableButtons.value(deckHandleGroup);
+    auto pPairEnable = m_channelEnableButtons.value(pairHandleGroup);
+    VERIFY_OR_DEBUG_ASSERT(pDeckEnable && pPairEnable) {
+        return;
+    }
+    // ControlObject does not emit valueChanged for changes it makes itself, so
+    // enable/disable the pair explicitly instead of relying on the pair's own
+    // button signal.
+    pPairEnable->set(pDeckEnable->get());
+    slotChannelStatusChanged(pDeckEnable->get(), pairHandleGroup);
+    connect(pDeckEnable.get(),
+            &ControlObject::valueChanged,
+            this,
+            [this, pPairEnable, pairHandleGroup](double value) {
+                pPairEnable->set(value);
+                slotChannelStatusChanged(value, pairHandleGroup);
+            });
+}
+
 void EffectChain::disableForInputChannel(const ChannelHandleAndGroup& handleGroup) {
     if (!m_enabledInputChannels.remove(handleGroup)) {
         return;

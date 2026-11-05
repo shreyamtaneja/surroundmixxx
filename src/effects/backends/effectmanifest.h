@@ -28,6 +28,7 @@ class EffectManifest {
               m_isMixingEQ(false),
               m_isMainEQ(false),
               m_effectRampsFromDry(false),
+              m_bypassOnCenterLfe(false),
               m_bAddDryToWet(false),
               m_metaknobDefault(0.0) {
     }
@@ -140,6 +141,15 @@ class EffectManifest {
         m_effectRampsFromDry = effectFadesFromDry;
     }
 
+    /// Effects that depend on a true left/right stereo field or generate
+    /// signal are bypassed on the surround center/LFE pair.
+    bool bypassOnCenterLfe() const {
+        return m_bypassOnCenterLfe;
+    }
+    void setBypassOnCenterLfe(bool bypass) {
+        m_bypassOnCenterLfe = bypass;
+    }
+
     bool addDryToWet() const {
         return m_bAddDryToWet;
     }
@@ -185,6 +195,7 @@ class EffectManifest {
     bool m_isMainEQ;
     QList<EffectManifestParameterPointer> m_parameters;
     bool m_effectRampsFromDry;
+    bool m_bypassOnCenterLfe;
     bool m_bAddDryToWet;
     double m_metaknobDefault;
 };

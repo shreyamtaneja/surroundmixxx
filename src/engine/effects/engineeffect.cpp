@@ -45,6 +45,7 @@ EngineEffect::EngineEffect(EffectManifestPointer pManifest,
             kMaxEngineFrames);
     m_pProcessor->initialize(activeInputChannels, registeredOutputChannels, engineParameters);
     m_effectRampsFromDry = pManifest->effectRampsFromDry();
+    m_bypassOnCenterLfe = pManifest->bypassOnCenterLfe();
 }
 
 EngineEffect::~EngineEffect() {
@@ -176,8 +177,8 @@ bool EngineEffect::process(const ChannelHandle& inputHandle,
 
     bool processingOccured = false;
 
-    if (effectiveEffectEnableState != EffectEnableState::Disabled) {
-        //TODO: refactor rest of audio engine to use mixxx::AudioParameters
+    if (effectiveEffectEnableState != EffectEnableState::Disabled &&
+            !(m_bypassOnCenterLfe && groupFeatures.isCenterLfe)) {
         const mixxx::EngineParameters engineParameters(
                 sampleRate,
                 numSamples / mixxx::kEngineChannelOutputCount);

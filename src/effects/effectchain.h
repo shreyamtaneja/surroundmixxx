@@ -45,6 +45,13 @@ class EffectChain : public QObject {
 
     void registerInputChannel(const ChannelHandleAndGroup& handleGroup,
             const double initialValue = 0.0);
+    // Activates EffectChain processing for the provided channel.
+    void enableForInputChannel(const ChannelHandleAndGroup& handleGroup);
+    void disableForInputChannel(const ChannelHandleAndGroup& handleGroup);
+    // Makes pairHandleGroup follow the enable state of deckHandleGroup. Both
+    // must be registered with this chain.
+    void linkInputChannel(const ChannelHandleAndGroup& deckHandleGroup,
+            const ChannelHandleAndGroup& pairHandleGroup);
     /// Do not store this in EffectSlot! The enabled input channels are a property
     /// of the chain, not the effect.
     const QSet<ChannelHandleAndGroup>& getActiveChannels() const {
@@ -95,10 +102,6 @@ class EffectChain : public QObject {
     EffectSlotPointer addEffectSlot(const QString& group);
 
     virtual int numPresets() const;
-
-    // Activates EffectChain processing for the provided channel.
-    void enableForInputChannel(const ChannelHandleAndGroup& handleGroup);
-    void disableForInputChannel(const ChannelHandleAndGroup& handleGroup);
 
     // Protected so QuickEffectChain can use the separate QuickEffect
     // chain preset list.

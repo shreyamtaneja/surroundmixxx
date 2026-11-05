@@ -115,6 +115,9 @@ void EffectsManager::addStandardEffectChains() {
 
         m_standardEffectChains.append(pChainSlot);
         m_effectChainSlotsByGroup.insert(pChainSlot->group(), pChainSlot);
+        for (const auto& link : std::as_const(m_surroundPairLinks)) {
+            pChainSlot->linkInputChannel(link.first, link.second);
+        }
     }
 }
 
@@ -122,6 +125,19 @@ void EffectsManager::addOutputEffectChain() {
     m_outputEffectChain = OutputEffectChainPointer(
             new OutputEffectChain(this, m_pMessenger));
     m_effectChainSlotsByGroup.insert(m_outputEffectChain->group(), m_outputEffectChain);
+    for (const auto& pairHandleGroup : std::as_const(m_outputSurroundPairs)) {
+        m_outputEffectChain->registerInputChannel(pairHandleGroup);
+        m_outputEffectChain->enableForInputChannel(pairHandleGroup);
+    }
+}
+
+void EffectsManager::addOutputSurroundPair(const ChannelHandleAndGroup& pairHandleGroup) {
+    registerInputChannel(pairHandleGroup);
+    m_outputSurroundPairs.push_back(pairHandleGroup);
+    if (m_outputEffectChain) {
+        m_outputEffectChain->registerInputChannel(pairHandleGroup);
+        m_outputEffectChain->enableForInputChannel(pairHandleGroup);
+    }
 }
 
 EffectChainPointer EffectsManager::getOutputEffectChain() const {
@@ -161,6 +177,21 @@ void EffectsManager::addStem(const ChannelHandleAndGroup& stemHandleGroup) {
     // previous state.
     if (m_initializedFromEffectsXml) {
         readEffectsXmlSingleDeckStem(stemHandleGroup.m_name);
+    }
+}
+
+void EffectsManager::addSurroundPair(const ChannelHandleAndGroup& deckHandleGroup,
+        const ChannelHandleAndGroup& pairHandleGroup) {
+    registerInputChannel(pairHandleGroup);
+    m_surroundPairLinks.emplace_back(deckHandleGroup, pairHandleGroup);
+    for (const auto& pChainSlot : std::as_const(m_standardEffectChains)) {
+        pChainSlot->linkInputChannel(deckHandleGroup, pairHandleGroup);
+    }
+    if (auto pEq = m_equalizerEffectChains.value(deckHandleGroup.name())) {
+        pEq->enableForInputChannel(pairHandleGroup);
+    }
+    if (auto pQuick = m_quickEffectChains.value(deckHandleGroup.name())) {
+        pQuick->enableForInputChannel(pairHandleGroup);
     }
 }
 

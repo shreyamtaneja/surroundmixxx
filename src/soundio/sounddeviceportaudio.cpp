@@ -37,6 +37,11 @@
 #include <pa_oboe.h>
 #endif
 
+#ifdef Q_OS_WIN
+// for PaWasapiStreamInfo and paWinWasapiExclusive
+#include <pa_win_wasapi.h>
+#endif
+
 namespace {
 
 // Buffer for drift correction 1 full, 1 for r/w, 1 empty
@@ -95,11 +100,13 @@ SoundDevicePortAudio::SoundDevicePortAudio(UserSettingsPointer config,
         SoundManager* sm,
         const PaDeviceInfo* deviceInfo,
         PaHostApiTypeId deviceTypeId,
-        unsigned int devIndex)
+        unsigned int devIndex,
+        bool wasapiExclusive)
         : SoundDevice(config, sm),
           m_pStream(nullptr),
           m_deviceInfo(deviceInfo),
           m_deviceTypeId(deviceTypeId),
+          m_wasapiExclusive(wasapiExclusive),
           m_outputDrift(0),
           m_inputDrift(0),
           m_bSetThreadPriority(false),
@@ -112,6 +119,10 @@ SoundDevicePortAudio::SoundDevicePortAudio(UserSettingsPointer config,
           m_bFinished(false) {
     // Setting parent class members:
     m_hostAPI = Pa_GetHostApiInfo(deviceInfo->hostApi)->name;
+    if (m_deviceTypeId == paWASAPI) {
+        m_hostAPI = m_wasapiExclusive ? SoundManagerConfig::kAPIWasapiExclusive
+                                      : SoundManagerConfig::kAPIWasapiShared;
+    }
     m_sampleRate = mixxx::audio::SampleRate::fromDouble(deviceInfo->defaultSampleRate);
     if (m_deviceTypeId == paALSA) {
         // PortAudio gives the device name including the ALSA hw device. The
@@ -130,6 +141,11 @@ SoundDevicePortAudio::SoundDevicePortAudio(UserSettingsPointer config,
         }
     } else {
         m_deviceId.name = deviceInfo->name;
+    }
+    if (m_wasapiExclusive) {
+        // The shared and exclusive variants of a device must have distinct IDs
+        // so that settings do not apply to both.
+        m_deviceId.name += QStringLiteral(" (Exclusive)");
     }
     m_deviceId.deviceIndex = devIndex;
     m_strDisplayName = QString::fromUtf8(deviceInfo->name);
@@ -276,6 +292,18 @@ SoundDeviceStatus SoundDevicePortAudio::open(bool isClkRefDevice, int syncBuffer
     m_inputParams.sampleFormat  = paFloat32;
     m_inputParams.suggestedLatency = bufferMSec / 1000.0;
     m_inputParams.hostApiSpecificStreamInfo = nullptr;
+
+#ifdef Q_OS_WIN
+    PaWasapiStreamInfo wasapiStreamInfo = {};
+    if (m_deviceTypeId == paWASAPI && m_wasapiExclusive) {
+        wasapiStreamInfo.size = sizeof(PaWasapiStreamInfo);
+        wasapiStreamInfo.hostApiType = paWASAPI;
+        wasapiStreamInfo.version = 1;
+        wasapiStreamInfo.flags = paWinWasapiExclusive;
+        m_outputParams.hostApiSpecificStreamInfo = &wasapiStreamInfo;
+        m_inputParams.hostApiSpecificStreamInfo = &wasapiStreamInfo;
+    }
+#endif
 
     qDebug() << "Opening stream with id" << m_deviceId.deviceIndex;
 

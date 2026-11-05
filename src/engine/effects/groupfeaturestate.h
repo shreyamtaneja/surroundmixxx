@@ -22,4 +22,7 @@ struct GroupFeatureState {
     std::optional<double> beat_fraction_buffer_end;
 
     std::optional<double> gain;
+
+    // True while processing the surround center/LFE pair.
+    bool isCenterLfe = false;
 };

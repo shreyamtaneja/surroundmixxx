@@ -52,6 +52,17 @@ class EngineChannel : public EngineObject {
         return {};
     }
 
+    // Number of stereo pairs (of the 3 in the surround buffer) that carry signal
+    // in the current callback.
+    virtual int getSurroundPairCount() const {
+        return 0;
+    }
+
+    // Effect handles of the surround pairs, in pair order.
+    virtual std::span<const ChannelHandleAndGroup> getSurroundPairHandles() const {
+        return {};
+    }
+
     void setPfl(bool enabled);
     virtual bool isPflEnabled() const;
     void setMainMix(bool enabled);

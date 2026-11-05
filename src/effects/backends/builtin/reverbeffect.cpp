@@ -16,6 +16,7 @@ EffectManifestPointer ReverbEffect::getManifest() {
     pManifest->setEffectRampsFromDry(true);
 
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Reverb"));
     pManifest->setAuthor("The Mixxx Team, CAPS Plugins");
     pManifest->setVersion("1.0");

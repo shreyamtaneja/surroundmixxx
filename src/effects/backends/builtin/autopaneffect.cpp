@@ -15,6 +15,7 @@ QString AutoPanEffect::getId() {
 EffectManifestPointer AutoPanEffect::getManifest() {
     EffectManifestPointer pManifest(new EffectManifest());
     pManifest->setId(getId());
+    pManifest->setBypassOnCenterLfe(true);
     pManifest->setName(QObject::tr("Autopan"));
     pManifest->setShortName(QObject::tr("Autopan"));
     pManifest->setAuthor("The Mixxx Team");
