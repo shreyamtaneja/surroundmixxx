@@ -7,6 +7,7 @@
 #include "engine/controls/bpmcontrol.h"
 #include "engine/effects/engineeffectsmanager.h"
 #include "engine/effects/groupfeaturestate.h"
+#include "engine/engine.h"
 #include "engine/enginebuffer.h"
 #include "engine/enginepregain.h"
 #include "moc_enginedeck.cpp"
@@ -258,18 +259,20 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
     } else if (m_pBuffer->getChannelCount() <= mixxx::kEngineChannelOutputCount) {
             // Process a single mono or stereo channel
             m_pBuffer->process(pOut, bufferSize);
-        } else if (isPrimaryDeck()) {
-            // Process multiple stereo channels (stems) and mix them together
-            processStem(pOut, bufferSize);
         } else {
-            const auto channelCount = m_pBuffer->getChannelCount();
             const std::size_t multichannelBufferSize =
                     bufferSize * channelCount /
                     mixxx::audio::ChannelCount::stereo();
-            m_pBuffer->process(m_surroundBuffer.data(), multichannelBufferSize);
+            VERIFY_OR_DEBUG_ASSERT(multichannelBufferSize <=
+                    static_cast<std::size_t>(m_multichannelScratchBuffer.size())) {
+                SampleUtil::clear(pOut, bufferSize);
+                return;
+            }
+            m_pBuffer->process(
+                    m_multichannelScratchBuffer.data(), multichannelBufferSize);
             SampleUtil::mixMultichannelToStereo(
                     pOut,
-                    m_surroundBuffer.data(),
+                    m_multichannelScratchBuffer.data(),
                     bufferSize / mixxx::audio::ChannelCount::stereo(),
                     channelCount);
         }
@@ -283,10 +286,16 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
             const std::size_t multichannelBufferSize =
                     bufferSize * channelCount /
                     mixxx::audio::ChannelCount::stereo();
-            m_pBuffer->process(m_surroundBuffer.data(), multichannelBufferSize);
+            VERIFY_OR_DEBUG_ASSERT(multichannelBufferSize <=
+                    static_cast<std::size_t>(m_multichannelScratchBuffer.size())) {
+                SampleUtil::clear(pOut, bufferSize);
+                return;
+            }
+            m_pBuffer->process(
+                    m_multichannelScratchBuffer.data(), multichannelBufferSize);
             SampleUtil::mixMultichannelToStereo(
                     pOut,
-                    m_surroundBuffer.data(),
+                    m_multichannelScratchBuffer.data(),
                     bufferSize / mixxx::audio::ChannelCount::stereo(),
                     channelCount);
         } else {

@@ -1,5 +1,7 @@
 #include "analyzer/analyzerbeats.h"
 
+#include <exception>
+
 #include <QHash>
 #include <QString>
 #include <QVector>
@@ -114,7 +116,15 @@ bool AnalyzerBeats::initialize(const AnalyzerTrack& track,
         }
 
         if (m_pPlugin) {
-            if (m_pPlugin->initialize(m_sampleRate)) {
+            bool initialized = false;
+            try {
+                initialized = m_pPlugin->initialize(m_sampleRate);
+            } catch (const std::exception& e) {
+                qWarning() << "Beat plugin initialize failed with exception:" << e.what();
+            } catch (...) {
+                qWarning() << "Beat plugin initialize failed with unknown exception";
+            }
+            if (initialized) {
                 qDebug() << "Beat calculation started with plugin" << m_pluginId;
             } else {
                 qDebug() << "Beat calculation will not start.";
@@ -227,8 +237,16 @@ bool AnalyzerBeats::processSamples(const CSAMPLE* pIn, SINT count) {
 
         pBeatInput = pDrumChannel;
     } else if (m_channelCount > mixxx::audio::ChannelCount::stereo()) {
-        DEBUG_ASSERT(!"Unsupported channel count");
-        return false;
+        // For generic multichannel input, analyze the stereo downmix.
+        count = numFrames * mixxx::audio::ChannelCount::stereo();
+        pDrumChannel = SampleUtil::alloc(count);
+
+        VERIFY_OR_DEBUG_ASSERT(pDrumChannel) {
+            return false;
+        }
+
+        SampleUtil::mixMultichannelToStereo(pDrumChannel, pIn, numFrames, m_channelCount);
+        pBeatInput = pDrumChannel;
     }
 
     m_currentFrame += numFrames;
@@ -236,7 +254,16 @@ bool AnalyzerBeats::processSamples(const CSAMPLE* pIn, SINT count) {
         return true; // silently ignore all remaining samples
     }
 
-    bool ret = m_pPlugin->processSamples(pBeatInput, count);
+    bool ret = false;
+    try {
+        ret = m_pPlugin->processSamples(pBeatInput, count);
+    } catch (const std::exception& e) {
+        qWarning() << "Beat plugin processSamples failed with exception:" << e.what();
+        m_pPlugin.reset();
+    } catch (...) {
+        qWarning() << "Beat plugin processSamples failed with unknown exception";
+        m_pPlugin.reset();
+    }
     if (pDrumChannel) {
         SampleUtil::free(pDrumChannel);
     }
@@ -252,33 +279,51 @@ void AnalyzerBeats::storeResults(TrackPointer pTrack) {
         return;
     }
 
-    if (!m_pPlugin->finalize()) {
+    bool finalized = false;
+    try {
+        finalized = m_pPlugin->finalize();
+    } catch (const std::exception& e) {
+        qWarning() << "Beat plugin finalize failed with exception:" << e.what();
+        return;
+    } catch (...) {
+        qWarning() << "Beat plugin finalize failed with unknown exception";
+        return;
+    }
+    if (!finalized) {
         qWarning() << "Beat/BPM analysis failed";
         return;
     }
 
     mixxx::BeatsPointer pBeats;
-    if (m_pPlugin->supportsBeatTracking()) {
-        QVector<mixxx::audio::FramePos> beats = m_pPlugin->getBeats();
-        QHash<QString, QString> extraVersionInfo = getExtraVersionInfo(
-                m_pluginId, m_bPreferencesFastAnalysis);
-        pBeats = BeatFactory::makePreferredBeats(
-                beats,
-                extraVersionInfo,
-                m_bPreferencesFixedTempo,
-                m_sampleRate);
-        qDebug() << "AnalyzerBeats plugin detected" << beats.size()
-                 << "beats. Predominant BPM:"
-                 << (pBeats ? pBeats->getBpmInRange(
-                                      mixxx::audio::kStartFramePos,
-                                      mixxx::audio::FramePos{
-                                              pTrack->getDuration() *
-                                              pBeats->getSampleRate()})
-                            : mixxx::Bpm());
-    } else {
-        mixxx::Bpm bpm = m_pPlugin->getBpm();
-        qDebug() << "AnalyzerBeats plugin detected constant BPM: " << bpm;
-        pBeats = mixxx::Beats::fromConstTempo(m_sampleRate, mixxx::audio::kStartFramePos, bpm);
+    try {
+        if (m_pPlugin->supportsBeatTracking()) {
+            QVector<mixxx::audio::FramePos> beats = m_pPlugin->getBeats();
+            QHash<QString, QString> extraVersionInfo = getExtraVersionInfo(
+                    m_pluginId, m_bPreferencesFastAnalysis);
+            pBeats = BeatFactory::makePreferredBeats(
+                    beats,
+                    extraVersionInfo,
+                    m_bPreferencesFixedTempo,
+                    m_sampleRate);
+            qDebug() << "AnalyzerBeats plugin detected" << beats.size()
+                     << "beats. Predominant BPM:"
+                     << (pBeats ? pBeats->getBpmInRange(
+                                          mixxx::audio::kStartFramePos,
+                                          mixxx::audio::FramePos{
+                                                  pTrack->getDuration() *
+                                                  pBeats->getSampleRate()})
+                                : mixxx::Bpm());
+        } else {
+            mixxx::Bpm bpm = m_pPlugin->getBpm();
+            qDebug() << "AnalyzerBeats plugin detected constant BPM: " << bpm;
+            pBeats = mixxx::Beats::fromConstTempo(m_sampleRate, mixxx::audio::kStartFramePos, bpm);
+        }
+    } catch (const std::exception& e) {
+        qWarning() << "Beat plugin result retrieval failed with exception:" << e.what();
+        return;
+    } catch (...) {
+        qWarning() << "Beat plugin result retrieval failed with unknown exception";
+        return;
     }
 
     pTrack->trySetBeats(pBeats);
