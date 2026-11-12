@@ -260,6 +260,7 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
             // Process a single mono or stereo channel
             m_pBuffer->process(pOut, bufferSize);
         } else {
+            const auto channelCount = m_pBuffer->getChannelCount();
             const std::size_t multichannelBufferSize =
                     bufferSize * channelCount /
                     mixxx::audio::ChannelCount::stereo();

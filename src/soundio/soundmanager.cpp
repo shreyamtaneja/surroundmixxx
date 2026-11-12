@@ -393,7 +393,8 @@ SoundDeviceStatus SoundManager::setupDevices() {
             if (!m_config.getForceNetworkClock() || jackApiUsed()) {
                 if (out.getType() == AudioPathType::Main) {
                     pNewMainClockRef = pDevice;
-                } else if ((out.getType() == AudioPathType::Deck ||
+                } else if ((out.getType() == AudioPathType::Surround ||
+                                   out.getType() == AudioPathType::Deck ||
                                    out.getType() == AudioPathType::Bus) &&
                         !pNewMainClockRef) {
                     pNewMainClockRef = pDevice;
