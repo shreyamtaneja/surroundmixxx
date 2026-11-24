@@ -50,6 +50,10 @@ void EncoderVorbis::setEncoderSettings(const EncoderSettings& settings)
     switch(settings.getChannelMode()) {
         case EncoderSettings::ChannelMode::MONO:  m_channels = 1; break;
         case EncoderSettings::ChannelMode::STEREO: m_channels = 2; break;
+        case EncoderSettings::ChannelMode::SURROUND_5_1:
+            qWarning() << "5.1 recording is not supported by this encoder";
+            m_channels = 0;
+            break;
         case EncoderSettings::ChannelMode::AUTOMATIC: // fallthrough
         default:
             if (m_bitrate > MONO_BITRATE_THRESHOLD ) {

@@ -43,11 +43,11 @@ class ShoutConnection
     void write(const unsigned char* header, const unsigned char* body,
                int headerLen, int bodyLen) override;
     // gets stream position
-    int tell() override;
+    std::int64_t tell() override;
     // sets stream position
-    void seek(int pos) override;
+    void seek(std::int64_t pos) override;
     // gets stream length
-    int filelen() override;
+    std::int64_t filelen() override;
 
     /** connects to server **/
     bool serverConnect();

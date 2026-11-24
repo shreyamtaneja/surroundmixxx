@@ -8,6 +8,7 @@
 #include "preferences/usersettings.h"
 
 class EngineMixer;
+class EngineSideChain;
 class ControlPushButton;
 class ControlProxy;
 class QDateTime;
@@ -66,6 +67,7 @@ class RecordingManager : public QObject {
     qint64 getFreeSpace();
 
     UserSettingsPointer m_pConfig;
+    EngineSideChain* m_pSidechain;
     QString m_recordingDir;
     // the base file
     QString m_recording_base_file;

@@ -57,8 +57,8 @@ EngineMixer::EngineMixer(UserSettingsPointer pConfig,
                   mixxx::SampleBuffer(kMaxEngineSamples),
                   mixxx::SampleBuffer(kMaxEngineSamples)}),
           m_surroundOutputBuffers({mixxx::SampleBuffer(kMaxEngineSamples),
-              mixxx::SampleBuffer(kMaxEngineSamples),
-              mixxx::SampleBuffer(kMaxEngineSamples)}),
+                  mixxx::SampleBuffer(kMaxEngineSamples),
+                  mixxx::SampleBuffer(kMaxEngineSamples)}),
           m_booth(kMaxEngineSamples),
           m_head(kMaxEngineSamples),
           m_talkover(kMaxEngineSamples),
@@ -420,11 +420,13 @@ void EngineMixer::process(const std::size_t bufferSize) {
     processChannels(bufferSize);
 
     CSAMPLE_GAIN crossfaderLeftGain, crossfaderRightGain;
-    EngineXfader::getXfadeGains(m_pCrossfader->get(), m_pXFaderCurve->get(),
+    EngineXfader::getXfadeGains(m_pCrossfader->get(),
+            m_pXFaderCurve->get(),
             m_pXFaderCalibration->get(),
             m_pXFaderMode->get(),
             m_pXFaderReverse->toBool(),
-            &crossfaderLeftGain, &crossfaderRightGain);
+            &crossfaderLeftGain,
+            &crossfaderRightGain);
     m_mainGain.setGains(crossfaderLeftGain, 1.0f, crossfaderRightGain);
 
     for (auto& surroundBuffer : m_surroundOutputBuffers) {
@@ -613,7 +615,7 @@ void EngineMixer::process(const std::size_t bufferSize) {
                 CSAMPLE_GAIN_ONE);
     }
 
-    if (mainEnabled) {
+    if (mainEnabled || (m_pEngineSideChain && m_pEngineSideChain->surroundRecordingRequested())) {
         // Mix the crossfader orientation buffers together into the main mix
         SampleUtil::copy3WithGain(m_main.data(),
                 m_outputBusBuffers[EngineChannel::LEFT].data(),
@@ -797,17 +799,6 @@ void EngineMixer::process(const std::size_t bufferSize) {
             }
         }
 
-        // Submit buffer to the side chain to do CPU intensive non-realtime
-        // tasks like recording. The SoundDeviceNetwork, responsible for
-        // passing samples to the network reads directly from m_pSidechainMix,
-        // registering it with SoundDevice::addOutput().
-        // Note: In case the broadcast/recording input is configured,
-        // EngineSideChain::receiveBuffer has copied the input buffer to m_pSidechainMix
-        // via before (called by SoundManager::pushInputBuffers())
-        if (m_pEngineSideChain) {
-            m_pEngineSideChain->writeSamples(m_sidechainMix.data(), iFrames);
-        }
-
         // Process effects that apply to main hardware output only but not
         // record/broadcast signal
         if (m_pEngineEffectsManager) {
@@ -868,6 +859,17 @@ void EngineMixer::process(const std::size_t bufferSize) {
         m_booth.clear(bufferSize);
     }
     processSurroundMain(bufferSize);
+    if (m_pEngineSideChain &&
+            (mainEnabled || m_pEngineSideChain->surroundRecordingRequested())) {
+        if (!mainEnabled && !m_bExternalRecordBroadcastInputConnected) {
+            m_sidechainMix.clear(bufferSize);
+        }
+        const std::array<const CSAMPLE*, 3> surroundPairs = {
+                m_surroundOutputBuffers[0].data(),
+                m_surroundOutputBuffers[1].data(),
+                m_surroundOutputBuffers[2].data()};
+        m_pEngineSideChain->writeSamples(m_sidechainMix.data(), surroundPairs, iFrames);
+    }
 
     if (headphoneEnabled) {
         m_pHeadDelay->process(m_head.data(), bufferSize);
@@ -1206,6 +1208,9 @@ void EngineMixer::onInputConnected(const AudioInput& input) {
         break;
     case AudioPathType::RecordBroadcast:
         m_bExternalRecordBroadcastInputConnected = true;
+        if (m_pEngineSideChain) {
+            m_pEngineSideChain->setExternalInputConnected(true);
+        }
         break;
     default:
         break;
@@ -1225,6 +1230,9 @@ void EngineMixer::onInputDisconnected(const AudioInput& input) {
         break;
     case AudioPathType::RecordBroadcast:
         m_bExternalRecordBroadcastInputConnected = false;
+        if (m_pEngineSideChain) {
+            m_pEngineSideChain->setExternalInputConnected(false);
+        }
         break;
     default:
         break;

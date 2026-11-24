@@ -1,86 +1,59 @@
-# Mixxx
+# SurroundMixxx
 
-[![GitHub latest tag](https://img.shields.io/github/tag/mixxxdj/mixxx.svg)](https://mixxx.org/download)
-[![Packaging status](https://repology.org/badge/tiny-repos/mixxx.svg)](https://repology.org/metapackage/mixxx/versions)
-[![Build status](https://github.com/mixxxdj/mixxx/actions/workflows/build.yml/badge.svg)](https://github.com/mixxxdj/mixxx/actions/workflows/build.yml)
-[![Coverage status](https://coveralls.io/repos/github/mixxxdj/mixxx/badge.svg)](https://coveralls.io/github/mixxxdj/mixxx)
-[![Zulip chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://mixxx.zulipchat.com)
-[![Donate](https://img.shields.io/opencollective/all/mixxx?label=Donate)](https://mixxx.org/donate)
+SurroundMixxx is an experimental fork of [Mixxx](https://mixxx.org/), the
+open-source DJ software, exploring spatial audio for DJing. It adds playback
+and mixing for 5.1 surround tracks while retaining Mixxx's familiar decks and
+controls.
 
-[Mixxx] is Free DJ software that gives you everything you need to perform live
-DJ mixes. Mixxx works on GNU/Linux, Windows, and macOS.
+**Status:** Windows is the tested platform, and 5.1 is the tested surround
+layout. This is a work in progress, not an official Mixxx release.
 
-## Quick Start
+## What works today
 
-To get started with Mixxx:
+- 5.1 playback through configured six-channel audio hardware, alongside stereo
+  tracks.
+- Deck gain, EQ, Quick Effects, effect units, faders, tempo and key lock on the
+  surround path.
+- BPM and key analysis and beat grids for 5.1 tracks; beat and key analysis use
+  the front left and right channels.
+- 5.1 recording of the internal surround mix to WAV or FLAC.
+- Windows WASAPI Shared and Exclusive audio output options.
 
-1. For live use, [download the latest stable version][download-stable].
-2. For experimentation and testing, [download a development release][download-testing].
-3. To live on the bleeding edge, clone the repo: `git clone https://github.com/mixxxdj/mixxx.git`
+Surround channels are currently processed as three stereo pairs, with a
+separate stereo path for outputs such as headphones, broadcasting and stereo
+recording. 5.1 recording does not capture external device processing, and is
+unavailable when an external Record/Broadcast input is configured. AIFF and
+lossy formats are not available for 5.1 recording. See the
+[surround guide](docs/surround-guide.md) for recording and other limitations.
 
-## Bug tracker
+## Getting started
 
-The Mixxx team uses [Github Issues][issues] to manage Mixxx development.
+You will need Windows, a 5.1-capable audio device and a suitable speaker setup.
+The [surround guide](docs/surround-guide.md) covers output routing, sample
+rates, latency, limitations and the project's future direction.
 
-Have a bug or feature request? [File a bug on Github][fileabug].
+Experimental builds may be available for testing by contacting the maintainer;
+a private contact link will be added here when available. There is no public
+download link yet. For building from source, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-Want to get involved in Mixxx development? Assign yourself a bug from the [easy
-bug list][easybugs] and get started!
+Before testing, back up your Mixxx settings and library: this fork may use the
+same settings directory as an existing Mixxx installation.
 
-## Building Mixxx
+## Future direction
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, code style
-guidelines, and how to open a pull request.
+Planned exploration includes 7.1, native Dolby Atmos support, macOS and Linux,
+a redesigned multichannel engine, spatial effects, and configurable speaker
+layouts and panning for dancefloors. These are goals, not available features
+or commitments to a release date.
 
-## Documentation
+## Credits and license
 
-For help using Mixxx, there are a variety of options:
+SurroundMixxx builds on the work of the
+[Mixxx project and its contributors](https://mixxx.org/). For general Mixxx
+usage, see the [Mixxx manual](https://manual.mixxx.org/).
 
-- [Mixxx manual][manual]
-- [Mixxx wiki][wiki]
-- [Hardware Compatibility]
-- [Creating Skins]
-
-## Translation
-
-Help to spread Mixxx with translations into more languages, as well as to update and ensure the accuracy of existing translations.
-
-- [Help translate content]
-- [Mixxx i18n wiki]
-- [Mixxx localization forum]
-- [Mixxx glossary]
-
-## Community
-
-Mixxx is a vibrant community of hackers, DJs and artists. To keep track of
-development and community news:
-
-- Chat with us on [Zulip][zulip].
-- Follow us on [Mastodon], [Bluesky] and [Facebook].
-- Subscribe to the [Mixxx Blog][blog].
-- Post on the [Mixxx forums][discourse].
-
-## License
-
-Mixxx is released under the GPLv2. See the LICENSE file for a full copy of the
-license.
-
-[mixxx]: https://mixxx.org
-[download-stable]: https://mixxx.org/download/#stable
-[download-testing]: https://mixxx.org/download/#testing
-[issues]: https://github.com/mixxxdj/mixxx/issues
-[fileabug]: https://github.com/mixxxdj/mixxx/issues/new/choose
-[mastodon]: https://floss.social/@mixxx
-[Bluesky]: https://bsky.app/profile/mixxx.bsky.social
-[facebook]: https://www.facebook.com/pages/Mixxx-DJ-Software/21723485212
-[blog]: https://mixxx.org/news/
-[manual]: https://manual.mixxx.org/
-[wiki]: https://github.com/mixxxdj/mixxx/wiki
-[easybugs]: https://github.com/mixxxdj/mixxx/issues?q=is%3Aopen+is%3Aissue+label%3Aeasy
-[creating skins]: https://mixxx.org/wiki/doku.php/Creating-Skins
-[help translate content]: https://explore.transifex.com/mixxx-dj-software/
-[Mixxx i18n wiki]: https://github.com/mixxxdj/mixxx/wiki/Internationalization
-[Mixxx localization forum]: https://mixxx.discourse.group/c/translation/13
-[hardware compatibility]: https://manual.mixxx.org/2.3/en/hardware/manuals.html
-[zulip]: https://mixxx.zulipchat.com/
-[discourse]: https://mixxx.discourse.group/
+Mixxx is free software distributed under the GNU General Public License
+version 2.
+See [LICENSE](LICENSE), [COPYING](COPYING), and the accompanying third-party
+and skin notices for the applicable terms.

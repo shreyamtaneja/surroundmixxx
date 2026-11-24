@@ -21,15 +21,18 @@ class EncoderSettings {
             QList<QString> controlNames;
         };
         enum class ChannelMode {
-            AUTOMATIC=0,
-            MONO=1,
-            STEREO=2
+            AUTOMATIC = 0,
+            MONO = 1,
+            STEREO = 2,
+            SURROUND_5_1 = 3
         };
 
-    virtual ~EncoderSettings() = default;
+        virtual ~EncoderSettings() = default;
 
-    // Returns the list of quality values supported, to assign them to the slider
-    virtual QList<int> getQualityValues() const { return QList<int>(); }
+        // Returns the list of quality values supported, to assign them to the slider
+        virtual QList<int> getQualityValues() const {
+            return QList<int>();
+        }
     virtual int getQuality() const { return 0; }
     virtual int getQualityIndex() const { return 0; }
     // Returns the list of compression values supported, to assign them to the slider

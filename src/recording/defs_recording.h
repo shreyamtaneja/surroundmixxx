@@ -16,6 +16,13 @@
 #define RECORD_ON 2.0
 #define RECORD_SPLIT_CONTINUE 3.0
 
+namespace mixxx::recording {
+constexpr int kStereo = 0;
+constexpr int kMono = 1;
+constexpr int kSurround51 = 2;
+constexpr int kSurroundChannelCount = 6;
+} // namespace mixxx::recording
+
 //File options for preferences Splitting
 #define SPLIT_650MB "650 MB (CD)"
 #define SPLIT_700MB "700 MB (CD)"

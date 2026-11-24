@@ -253,10 +253,10 @@ void EngineDeck::process(CSAMPLE* pOut, const std::size_t bufferSize) {
 
 #ifdef __STEM__
         // Process the raw audio
-    if (m_pBuffer->getChannelCount() == mixxx::audio::ChannelCount(kSurroundChannelCount)) {
-        processSurround(pOut, bufferSize);
-        surroundProcessed = true;
-    } else if (m_pBuffer->getChannelCount() <= mixxx::kEngineChannelOutputCount) {
+        if (m_pBuffer->getChannelCount() == mixxx::audio::ChannelCount(kSurroundChannelCount)) {
+            processSurround(pOut, bufferSize);
+            surroundProcessed = true;
+        } else if (m_pBuffer->getChannelCount() <= mixxx::kEngineChannelOutputCount) {
             // Process a single mono or stereo channel
             m_pBuffer->process(pOut, bufferSize);
         } else {

@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "encoder/encoderflacsettings.h"
+#include "recording/defs_recording.h"
 
 namespace {
 constexpr SINT kEncBufferSize = 8192; // used inside libsndfile for flac
@@ -40,6 +41,18 @@ EncoderSndfileFlac::EncoderSndfileFlac(EncoderCallback* pCallback)
 void EncoderSndfileFlac::setEncoderSettings(const EncoderSettings& settings)
 {
     m_sfInfo.format = SF_FORMAT_FLAC;
+    switch (settings.getChannelMode()) {
+    case EncoderSettings::ChannelMode::MONO:
+        m_channels = 1;
+        break;
+    case EncoderSettings::ChannelMode::SURROUND_5_1:
+        m_channels = mixxx::recording::kSurroundChannelCount;
+        break;
+    case EncoderSettings::ChannelMode::STEREO:
+    case EncoderSettings::ChannelMode::AUTOMATIC:
+        m_channels = 2;
+        break;
+    }
 
     int radio = settings.getSelectedOption(EncoderFlacSettings::BITS_GROUP);
     switch(radio) {
@@ -63,7 +76,8 @@ void EncoderSndfileFlac::encodeBuffer(const CSAMPLE* pBuffer, const std::size_t 
     if (m_pClampBuffer) {
         SINT numSamplesLeft = bufferSize;
         while (numSamplesLeft > 0) {
-            const SINT numSamplesToWrite = std::min(numSamplesLeft, kEncBufferSize);
+            const SINT maxSamples = kEncBufferSize / m_channels * m_channels;
+            const SINT numSamplesToWrite = std::min(numSamplesLeft, maxSamples);
             convertFloat32ToIntFormat(m_pClampBuffer.get(),
                     pBuffer,
                     numSamplesToWrite,

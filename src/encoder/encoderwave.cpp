@@ -31,13 +31,13 @@ static sf_count_t  sf_f_seek (sf_count_t offset, int whence, void *user_data)
     EncoderCallback* pCallback = static_cast<EncoderCallback*>(user_data);
     if (whence == SEEK_SET) {
         new_offset = offset;
-        pCallback->seek(static_cast<int>(new_offset));
+        pCallback->seek(new_offset);
     } else if (whence == SEEK_CUR) {
         new_offset = pCallback->tell()+offset;
-        pCallback->seek(static_cast<int>(new_offset));
+        pCallback->seek(new_offset);
     } else {
-        new_offset =  pCallback->filelen()-offset;
-        pCallback->seek(static_cast<int>(new_offset));
+        new_offset = pCallback->filelen() + offset;
+        pCallback->seek(new_offset);
     }
     return new_offset;
 }
@@ -142,6 +142,12 @@ void EncoderWave::setEncoderSettings(const EncoderSettings& settings) {
     case EncoderSettings::ChannelMode::STEREO:
         m_channels = 2;
         break;
+    case EncoderSettings::ChannelMode::SURROUND_5_1:
+        m_channels = mixxx::recording::kSurroundChannelCount;
+        if (format == ENCODING_WAVE) {
+            m_sfInfo.format = (m_sfInfo.format & ~SF_FORMAT_TYPEMASK) | SF_FORMAT_WAVEX;
+        }
+        break;
     case EncoderSettings::ChannelMode::AUTOMATIC:
         m_channels = 2;
         break;
@@ -179,10 +185,10 @@ void EncoderWave::flush() {
             tagBuffer.size());
 
     // Update the file header with the new file size
-    int fileSize = m_pCallback->tell();
+    const auto fileSize = m_pCallback->tell();
     m_pCallback->seek(4);
     auto fileSizeBuffer = QByteArray(4, 0);
-    qToLittleEndian(fileSize - 8, listChunkHeaderBuffer.data());
+    qToLittleEndian(static_cast<quint32>(fileSize - 8), fileSizeBuffer.data());
     m_pCallback->write(nullptr,
             reinterpret_cast<const unsigned char*>(fileSizeBuffer.constData()),
             0,

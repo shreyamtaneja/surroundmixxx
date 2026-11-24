@@ -18,6 +18,7 @@
 
 RecordingManager::RecordingManager(UserSettingsPointer pConfig, EngineMixer* pEngine)
         : m_pConfig(pConfig),
+          m_pSidechain(pEngine->getSideChain()),
           m_recordingDir(""),
           m_recording_base_file(""),
           m_recordingFile(""),
@@ -39,9 +40,9 @@ RecordingManager::RecordingManager(UserSettingsPointer pConfig, EngineMixer* pEn
     m_pCoRecStatus = std::make_unique<ControlObject>(ConfigKey(RECORDING_PREF_KEY, "status"));
 
     // Register EngineRecord with the engine sidechain.
-    EngineSideChain* pSidechain = pEngine->getSideChain();
+    EngineSideChain* pSidechain = m_pSidechain;
     if (pSidechain) {
-        EngineRecord* pEngineRecord = new EngineRecord(m_pConfig);
+        EngineRecord* pEngineRecord = new EngineRecord(m_pConfig, pSidechain);
         connect(pEngineRecord,
                 &EngineRecord::isRecording,
                 this,
@@ -66,9 +67,9 @@ QString RecordingManager::formatDateTimeForFilename(const QDateTime& dateTime) c
 }
 
 void RecordingManager::slotSetRecording(bool recording) {
-    if (recording && !isRecordingActive()) {
+    if (recording && m_pCoRecStatus->get() == RECORD_OFF) {
         startRecording();
-    } else if (!recording && isRecordingActive()) {
+    } else if (!recording && m_pCoRecStatus->get() != RECORD_OFF) {
         stopRecording();
     }
 }
@@ -76,7 +77,7 @@ void RecordingManager::slotSetRecording(bool recording) {
 void RecordingManager::slotToggleRecording(double value) {
     bool toggle = static_cast<bool>(value);
     if (toggle) {
-        if (isRecordingActive()) {
+        if (m_pCoRecStatus->get() != RECORD_OFF) {
             stopRecording();
         } else {
             startRecording();
@@ -96,6 +97,12 @@ qint64 RecordingManager::getFreeSpace() {
 }
 
 void RecordingManager::startRecording() {
+    if (m_pSidechain) {
+        m_pSidechain->setSurroundRecordingRequested(
+                m_pConfig->getValue<int>(
+                        ConfigKey(RECORDING_PREF_KEY, "channel_mode"),
+                        mixxx::recording::kStereo) == mixxx::recording::kSurround51);
+    }
     QString encodingType = m_pConfig->getValueString(
             ConfigKey(RECORDING_PREF_KEY, "Encoding"));
     QString fileExtension = EncoderFactory::getFactory()
@@ -115,6 +122,11 @@ void RecordingManager::startRecording() {
     if (fileSizeStr != SPLIT_NONE) {
         m_split_size = getFileSplitSize(fileSizeStr);
         m_split_time = getFileSplitSeconds(fileSizeStr);
+    } else if (encodingType == ENCODING_WAVE &&
+            m_pConfig->getValue<int>(
+                    ConfigKey(RECORDING_PREF_KEY, "channel_mode"),
+                    mixxx::recording::kStereo) == mixxx::recording::kSurround51) {
+        m_split_size = SIZE_4GB;
     }
     if (m_split_time < INT_MAX) {
         qDebug() << "Split time is:" << m_split_time;
@@ -282,6 +294,9 @@ void RecordingManager::slotIsRecording(bool isRecordingActive, bool error) {
 
     // Notify the GUI controls, see dlgrecording.cpp.
     m_bRecording = isRecordingActive;
+    if (!isRecordingActive && m_pSidechain && m_pCoRecStatus->get() == RECORD_OFF) {
+        m_pSidechain->setSurroundRecordingRequested(false);
+    }
     emit isRecording(isRecordingActive);
 
     if (error) {

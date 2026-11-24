@@ -249,7 +249,7 @@ mixxx::audio::ChannelCount AudioPath::maxChannelsForType(AudioPathType type) {
 AudioOutput::AudioOutput(AudioPathType type,
         unsigned char channelBase,
         mixxx::audio::ChannelCount channels,
-    unsigned char index)
+        unsigned char index)
         : AudioPath(channelBase, channels) {
     // TODO(rryan): This is a virtual function call from a constructor.
     setType(type);

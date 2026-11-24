@@ -23,6 +23,7 @@ class Encoder {
         QString internalName;
         bool lossless;
         QString fileExtension;
+        bool supportsSurround51 = false;
     };
 
     Encoder() {}

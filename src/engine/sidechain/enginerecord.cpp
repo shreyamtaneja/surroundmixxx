@@ -4,6 +4,7 @@
 
 #include "control/controlproxy.h"
 #include "encoder/encoder.h"
+#include "engine/sidechain/enginesidechain.h"
 #include "mixer/playerinfo.h"
 #include "moc_enginerecord.cpp"
 #include "preferences/usersettings.h"
@@ -14,8 +15,9 @@
 
 constexpr int kMetaDataLifeTimeout = 16;
 
-EngineRecord::EngineRecord(UserSettingsPointer pConfig)
+EngineRecord::EngineRecord(UserSettingsPointer pConfig, EngineSideChain* pSidechain)
         : m_pConfig(pConfig),
+          m_pSidechain(pSidechain),
           m_sampleRateControl(
                   QStringLiteral("[App]"), QStringLiteral("samplerate")),
           m_frames(0),
@@ -63,6 +65,14 @@ int EngineRecord::updateFromPreferences() {
         m_pEncoder.reset();
     }
     Encoder::Format format = EncoderFactory::getFactory().getSelectedFormat(m_pConfig);
+    if (m_recordChannelMode == mixxx::recording::kSurround51 && !format.supportsSurround51) {
+        ErrorDialogProperties* props = ErrorDialogHandler::instance()->newDialogProperties();
+        props->setType(DLG_WARNING);
+        props->setTitle(QObject::tr("Recording"));
+        props->setText(QObject::tr("The selected file format does not support 5.1 recording."));
+        ErrorDialogHandler::instance()->requestErrorDialog(props);
+        return -1;
+    }
     m_encoding = format.internalName;
     m_pEncoder = EncoderFactory::getFactory().createRecordingEncoder(
             format, m_pConfig, this);
@@ -127,9 +137,46 @@ bool EngineRecord::metaDataHasChanged()
     return true;
 }
 
+void EngineRecord::processWithSurround(const CSAMPLE* pStereo,
+        const CSAMPLE* pSurround,
+        std::size_t frames,
+        bool externalInputConnected) {
+    m_pSurroundBuffer = pSurround;
+    m_externalInputConnected = externalInputConnected;
+    process(pStereo, frames * 2);
+    m_pSurroundBuffer = nullptr;
+}
+
 void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize) {
     const auto recordingStatus = static_cast<int>(m_pRecReady->get());
     static const QString tag("EngineRecord recording");
+
+    if (recordingStatus == RECORD_READY) {
+        m_recordChannelMode = m_pConfig->getValue<int>(
+                ConfigKey(RECORDING_PREF_KEY, "channel_mode"), mixxx::recording::kStereo);
+    }
+    if (recordingStatus != RECORD_OFF &&
+            m_recordChannelMode == mixxx::recording::kSurround51 &&
+            (m_externalInputConnected || !m_pSurroundBuffer)) {
+        if (fileOpen()) {
+            Event::end(tag);
+            closeFile();
+            if (m_bCueIsEnabled) {
+                closeCueFile();
+            }
+        }
+        m_pRecReady->set(RECORD_OFF);
+        ErrorDialogProperties* props = ErrorDialogHandler::instance()->newDialogProperties();
+        props->setType(DLG_WARNING);
+        props->setTitle(QObject::tr("Recording"));
+        props->setText(m_externalInputConnected
+                        ? QObject::tr("5.1 recording is unavailable while an external "
+                                      "Record/Broadcast input is configured.")
+                        : QObject::tr("The 5.1 recording signal is unavailable."));
+        ErrorDialogHandler::instance()->requestErrorDialog(props);
+        emit isRecording(false, false);
+        return;
+    }
 
     if (recordingStatus == RECORD_OFF) {
         //qDebug("Setting record flag to: OFF");
@@ -139,6 +186,8 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize)
             if (m_bCueIsEnabled) {
                 closeCueFile();
             }
+            emit isRecording(false, false);
+        } else if (m_pSidechain && m_pSidechain->surroundRecordingRequested()) {
             emit isRecording(false, false);
         }
     } else if (recordingStatus == RECORD_READY) {
@@ -186,8 +235,11 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize)
                 closeCueFile();
             }
         }
-        updateFromPreferences();  // Update file location from preferences.
-        if (openFile()) {
+        if (updateFromPreferences() < 0) {
+            Event::end(tag);
+            m_pRecReady->set(RECORD_OFF);
+            emit isRecording(false, false);
+        } else if (openFile()) {
             qDebug() << "Splitting to a new file: "<< m_fileName;
             m_pRecReady->set(RECORD_ON);
             emit isRecording(true, false);  // will notify the RecordingManager
@@ -205,7 +257,7 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize)
                 openCueFile();
                 m_cueTrack = 0;
             }
-        } else {  // Maybe the encoder could not be initialized
+        } else { // Maybe the encoder could not be initialized
             qDebug() << "Could not open" << m_fileName << "for writing.";
             Event::end(tag);
             qDebug("Setting record flag to: OFF");
@@ -218,15 +270,14 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize)
     // Checking again from m_pRecReady since its status might have changed
     // in the previous "if" blocks.
     if (m_pRecReady->get() == RECORD_ON) {
-        int channelMode = m_pConfig->getValue<int>(
-                ConfigKey(RECORDING_PREF_KEY, "channel_mode"), 0);
-        bool recordMono = (channelMode == 1);
+        bool recordMono = (m_recordChannelMode == mixxx::recording::kMono);
         /* Downmixing audio to mono if mono recording is enabled.
         We need to do it before encoding because some encoders don't support mono
         and we want to be able to record in mono even with these encoders.*/
         const CSAMPLE* bufferToEncode = pBuffer;
         std::vector<CSAMPLE> monoBuffer;
         std::size_t encoderBufferSize = bufferSize;
+        std::size_t encoderChannels = 2;
 
         if (recordMono) {
             // Allocate mono buffer (half the size since we're going from 2 channels to 1)
@@ -234,6 +285,11 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize)
             SampleUtil::mixMultichannelToMono(monoBuffer.data(), pBuffer, bufferSize);
             bufferToEncode = monoBuffer.data();
             encoderBufferSize = bufferSize / 2;
+            encoderChannels = 1;
+        } else if (m_recordChannelMode == mixxx::recording::kSurround51) {
+            bufferToEncode = m_pSurroundBuffer;
+            encoderChannels = mixxx::recording::kSurroundChannelCount;
+            encoderBufferSize = bufferSize / 2 * encoderChannels;
         }
 
         // Compress audio. Encoder will call method 'write()' below to
@@ -258,7 +314,7 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const std::size_t bufferSize)
         }
 
         // update frames counting and recorded duration (seconds)
-        m_frames += encoderBufferSize / 2;
+        m_frames += encoderBufferSize / encoderChannels;
         unsigned long lastDuration = m_recordedDuration;
         m_recordedDuration = m_frames / m_sampleRate;
 
@@ -328,21 +384,21 @@ void EngineRecord::write(const unsigned char *header, const unsigned char *body,
 
 }
 // Encoder calls this method to write compressed audio
-int EngineRecord::tell() {
+std::int64_t EngineRecord::tell() {
     if (!fileOpen()) {
         return -1;
     }
     return m_dataStream.device()->pos();
 }
 // Encoder calls this method to write compressed audio
-void EngineRecord::seek(int pos) {
+void EngineRecord::seek(std::int64_t pos) {
     if (!fileOpen()) {
         return;
     }
     m_dataStream.device()->seek(static_cast<qint64>(pos));
 }
 // These are not used for streaming, but the interface requires them
-int EngineRecord::filelen() {
+std::int64_t EngineRecord::filelen() {
     if (!fileOpen()) {
         return 0;
     }

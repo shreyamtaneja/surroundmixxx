@@ -14,19 +14,21 @@
 #include "engine/sidechain/sidechainworker.h"
 #include "moc_enginesidechain.cpp"
 #include "util/counter.h"
+#include "util/defs.h"
 #include "util/event.h"
 #include "util/sample.h"
 #include "util/trace.h"
-
-#define SIDECHAIN_BUFFER_SIZE 65536
 
 EngineSideChain::EngineSideChain(
         UserSettingsPointer pConfig,
         CSAMPLE* sidechainMix)
         : m_pConfig(pConfig),
           m_bStopThread(false),
-          m_sampleFifo(SIDECHAIN_BUFFER_SIZE),
-          m_pWorkBuffer(SampleUtil::alloc(SIDECHAIN_BUFFER_SIZE)),
+          m_sampleFifo(SIDECHAIN_BUFFER_SIZE / 2),
+          m_writeBuffer(kMaxEngineFrames),
+          m_workBuffer(SIDECHAIN_BUFFER_SIZE / 2),
+          m_stereoBuffer(SIDECHAIN_BUFFER_SIZE),
+          m_surroundBuffer(SIDECHAIN_BUFFER_SIZE / 2 * mixxx::recording::kSurroundChannelCount),
           m_pSidechainMix(sidechainMix) {
     // We use HighPriority to prevent starvation by lower-priority processes (Qt
     // main thread, analysis, etc.). This used to be LowPriority but that is not
@@ -53,8 +55,6 @@ EngineSideChain::~EngineSideChain() {
         delete pWorker;
     }
     locker.unlock();
-
-    SampleUtil::free(m_pWorkBuffer);
 }
 
 void EngineSideChain::addSideChainWorker(SideChainWorker* pWorker) {
@@ -74,17 +74,31 @@ void EngineSideChain::receiveBuffer(const AudioInput& input,
     SampleUtil::copy(m_pSidechainMix, pBuffer, iFrames * mixxx::kEngineChannelOutputCount);
 }
 
-void EngineSideChain::writeSamples(const CSAMPLE* pBuffer, int iFrames) {
+void EngineSideChain::writeSamples(const CSAMPLE* pStereo,
+        const std::array<const CSAMPLE*, 3>& surroundPairs,
+        int iFrames) {
     Trace sidechain("EngineSideChain::writeSamples");
-    // TODO: remove assumption of stereo buffer
-    const int numSamples = iFrames * mixxx::kEngineChannelOutputCount;
-    const int numSamplesWritten = m_sampleFifo.write(pBuffer, numSamples);
+    VERIFY_OR_DEBUG_ASSERT(iFrames >= 0 &&
+            static_cast<std::size_t>(iFrames) <= m_writeBuffer.size()) {
+        return;
+    }
+    for (int frame = 0; frame < iFrames; ++frame) {
+        auto& dst = m_writeBuffer[frame];
+        for (int channel = 0; channel < 2; ++channel) {
+            dst.stereo[channel] = pStereo[frame * 2 + channel];
+        }
+        for (int pair = 0; pair < 3; ++pair) {
+            dst.surround[pair * 2] = surroundPairs[pair][frame * 2];
+            dst.surround[pair * 2 + 1] = surroundPairs[pair][frame * 2 + 1];
+        }
+    }
+    const int framesWritten = m_sampleFifo.write(m_writeBuffer.data(), iFrames);
 
-    if (numSamplesWritten != numSamples) {
+    if (framesWritten != iFrames) {
         Counter("EngineSideChain::writeSamples buffer overrun").increment();
     }
 
-    if (m_sampleFifo.writeAvailable() < SIDECHAIN_BUFFER_SIZE / 5) {
+    if (m_sampleFifo.writeAvailable() < SIDECHAIN_BUFFER_SIZE / 10) {
         // Signal to the sidechain that samples are available.
         Trace wakeup("EngineSideChain::writeSamples wake up");
         m_waitForSamples.wakeAll();
@@ -107,13 +121,26 @@ void EngineSideChain::run() {
         m_waitLock.unlock();
         Event::start(tag);
 
-        int samples_read;
-        while ((samples_read = m_sampleFifo.read(m_pWorkBuffer,
-                                                 SIDECHAIN_BUFFER_SIZE))) {
+        int framesRead;
+        while ((framesRead = m_sampleFifo.read(m_workBuffer.data(),
+                        static_cast<int>(m_workBuffer.size())))) {
             Trace process("EngineSideChain::process");
+            for (int frame = 0; frame < framesRead; ++frame) {
+                for (int channel = 0; channel < 2; ++channel) {
+                    m_stereoBuffer[frame * 2 + channel] = m_workBuffer[frame].stereo[channel];
+                }
+                for (int channel = 0; channel < mixxx::recording::kSurroundChannelCount;
+                        ++channel) {
+                    m_surroundBuffer[frame * mixxx::recording::kSurroundChannelCount + channel] =
+                            m_workBuffer[frame].surround[channel];
+                }
+            }
             MMutexLocker locker(&m_workerLock);
             foreach (SideChainWorker* pWorker, m_workers) {
-                pWorker->process(m_pWorkBuffer, samples_read);
+                pWorker->processWithSurround(m_stereoBuffer.data(),
+                        m_surroundBuffer.data(),
+                        framesRead,
+                        m_externalInputConnected.load(std::memory_order_relaxed));
             }
         }
 

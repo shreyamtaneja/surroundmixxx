@@ -5,6 +5,7 @@
 #include <QStandardItemModel>
 #include <QStandardPaths>
 
+#include "control/controlproxy.h"
 #include "encoder/encoder.h"
 #include "encoder/encodermp3settings.h"
 #include "moc_dlgprefrecord.cpp"
@@ -24,8 +25,10 @@ DlgPrefRecord::DlgPrefRecord(QWidget* parent, UserSettingsPointer pConfig)
     setupUi(this);
 
     // Recording audio output mode
-    recordingMainOutputModeComboBox->addItem(tr("Stereo"), 0);
-    recordingMainOutputModeComboBox->addItem(tr("Mono"), 1);
+    recordingMainOutputModeComboBox->addItem(tr("Stereo"), mixxx::recording::kStereo);
+    recordingMainOutputModeComboBox->addItem(tr("Mono"), mixxx::recording::kMono);
+    recordingMainOutputModeComboBox->addItem(
+            tr("6 channel (5.1)"), mixxx::recording::kSurround51);
     loadChannelMode();
 
     // Setting recordings path.
@@ -78,6 +81,13 @@ DlgPrefRecord::DlgPrefRecord(QWidget* parent, UserSettingsPointer pConfig)
                 ConfigValue(m_selFormat.internalName));
     }
 
+    connect(recordingMainOutputModeComboBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int) {
+                updateAvailableFormats();
+            });
+    updateAvailableFormats();
     setupEncoderUI();
 
     // Setting Metadata
@@ -115,6 +125,7 @@ DlgPrefRecord::DlgPrefRecord(QWidget* parent, UserSettingsPointer pConfig)
                 comboBoxSplitting->findData(SPLIT_4096MB));
         saveSplitSize();
     }
+    updateSplitNoneItem();
 
     setScrollSafeGuard(comboBoxSplitting);
 
@@ -167,6 +178,21 @@ DlgPrefRecord::~DlgPrefRecord() {
 }
 
 void DlgPrefRecord::slotApply() {
+    ControlProxy recordingStatus(RECORDING_PREF_KEY, "status");
+    if (recordingStatus.get() != RECORD_OFF &&
+            (recordingMainOutputModeComboBox->currentData().toInt() !=
+                            m_pConfig->getValue<int>(
+                                    ConfigKey(
+                                            RECORDING_PREF_KEY, "channel_mode"),
+                                    mixxx::recording::kStereo) ||
+                    m_selFormat.internalName !=
+                            m_pConfig->getValueString(ConfigKey(
+                                    RECORDING_PREF_KEY, "Encoding")))) {
+        QMessageBox::warning(this,
+                tr("Recording"),
+                tr("Stop recording before changing the audio channels or file format."));
+        return;
+    }
     saveRecordingFolder();
     saveMetaData();
     saveEncoding();
@@ -174,7 +200,7 @@ void DlgPrefRecord::slotApply() {
     saveTracklistAsComment();
     saveUseCueFileAnnotation();
     saveSplitSize();
-    saveChannelMode(); // saving channel preference (Mono/Stereo) to the config
+    saveChannelMode();
 }
 // This function is saving the channel mode selection to the config
 void DlgPrefRecord::saveChannelMode() {
@@ -207,9 +233,17 @@ void DlgPrefRecord::slotUpdate() {
     for (const Encoder::Format& format : EncoderFactory::getFactory().getFormats()) {
         if (prefformat == format.internalName) {
             m_selFormat = format;
+            for (QRadioButton* button : std::as_const(m_formatButtons)) {
+                if (button->objectName() == prefformat) {
+                    button->setChecked(true);
+                    break;
+                }
+            }
             break;
         }
     }
+    loadChannelMode();
+    updateAvailableFormats();
     setupEncoderUI();
 
     loadMetaData();
@@ -220,17 +254,18 @@ void DlgPrefRecord::slotUpdate() {
     updateTracklistAsComment();
 
     slotToggleCueEnabled();
-    loadChannelMode(); // Load recording channel mode (Mono/Stereo) to keep the
-                       // ui updated if reopening preferences
 
     QString fileSizeStr = m_pConfig->getValueString(ConfigKey(RECORDING_PREF_KEY, "FileSize"));
     int index = comboBoxSplitting->findData(fileSizeStr);
     if (index >= 0) {
         comboBoxSplitting->setCurrentIndex(index);
     }
+    updateSplitNoneItem();
 }
 
 void DlgPrefRecord::slotResetToDefaults() {
+    recordingMainOutputModeComboBox->setCurrentIndex(
+            recordingMainOutputModeComboBox->findData(mixxx::recording::kStereo));
     m_formatButtons.first()->setChecked(true);
     m_selFormat = EncoderFactory::getFactory().getFormatFor(
             m_formatButtons.first()->objectName());
@@ -364,6 +399,25 @@ void DlgPrefRecord::loadChannelMode() {
 
     recordingMainOutputModeComboBox->setCurrentIndex(
             index >= 0 ? index : 0);
+}
+
+void DlgPrefRecord::updateAvailableFormats() {
+    const bool surround = recordingMainOutputModeComboBox->currentData().toInt() ==
+            mixxx::recording::kSurround51;
+    for (QRadioButton* button : std::as_const(m_formatButtons)) {
+        const auto format = EncoderFactory::getFactory().getFormatFor(button->objectName());
+        button->setEnabled(!surround || format.supportsSurround51);
+    }
+    if (surround && !m_selFormat.supportsSurround51) {
+        m_selFormat = EncoderFactory::getFactory().getFormatFor(ENCODING_WAVE);
+        for (QRadioButton* button : std::as_const(m_formatButtons)) {
+            if (button->objectName() == m_selFormat.internalName) {
+                button->setChecked(true);
+                break;
+            }
+        }
+        setupEncoderUI();
+    }
 }
 
 void DlgPrefRecord::slotSliderQuality() {

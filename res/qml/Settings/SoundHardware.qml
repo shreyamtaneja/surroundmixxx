@@ -129,7 +129,7 @@ Category {
                 }
                 console.log(isOutput ? "addOutput" : "addInput", device, type, channel * 2, index);
                 if (isOutput) {
-                        manager.addOutput(device, type, channel * 2, index);
+                    manager.addOutput(device, type, channel * 2, index);
                 } else {
                     manager.addInput(device, type, channel * 2, index);
                 }

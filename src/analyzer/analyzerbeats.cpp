@@ -1,11 +1,10 @@
 #include "analyzer/analyzerbeats.h"
 
-#include <exception>
-
 #include <QHash>
 #include <QString>
 #include <QVector>
 #include <QtDebug>
+#include <exception>
 
 #include "analyzer/analyzertrack.h"
 #include "analyzer/constants.h"

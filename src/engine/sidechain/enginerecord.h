@@ -13,24 +13,29 @@
 #include "track/track_decl.h"
 
 class ControlProxy;
+class EngineSideChain;
 
 class EngineRecord : public QObject, public EncoderCallback, public SideChainWorker {
     Q_OBJECT
   public:
-    EngineRecord(UserSettingsPointer pConfig);
+    EngineRecord(UserSettingsPointer pConfig, EngineSideChain* pSidechain);
     ~EngineRecord() override;
 
     void process(const CSAMPLE* pBuffer, const std::size_t bufferSize) override;
+    void processWithSurround(const CSAMPLE* pStereo,
+            const CSAMPLE* pSurround,
+            std::size_t frames,
+            bool externalInputConnected) override;
     void shutdown() override {}
 
     // writes compressed audio to file
     void write(const unsigned char *header, const unsigned char *body, int headerLen, int bodyLen) override;
     // gets stream position
-    int tell() override;
+    std::int64_t tell() override;
     // sets stream position
-    void seek(int pos) override;
+    void seek(std::int64_t pos) override;
     // gets stream length
-    int filelen()  override;
+    std::int64_t filelen() override;
 
     // creates or opens an audio file
     bool openFile();
@@ -62,6 +67,7 @@ class EngineRecord : public QObject, public EncoderCallback, public SideChainWor
     void writeCueLine();
 
     UserSettingsPointer m_pConfig;
+    EngineSideChain* m_pSidechain;
     EncoderPointer m_pEncoder;
     QString m_encoding;
     QString m_fileName;
@@ -88,4 +94,7 @@ class EngineRecord : public QObject, public EncoderCallback, public SideChainWor
     bool m_bCueIsEnabled;
     bool m_bTracklistAsCommentEnabled;
     bool m_bCueUsesFileAnnotation;
+    const CSAMPLE* m_pSurroundBuffer = nullptr;
+    bool m_externalInputConnected = false;
+    int m_recordChannelMode = 0;
 };

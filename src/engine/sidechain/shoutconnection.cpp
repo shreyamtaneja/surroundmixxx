@@ -702,19 +702,19 @@ void ShoutConnection::write(const unsigned char* header, const unsigned char* bo
     }
 }
 // These are not used for streaming, but the interface requires them
-int ShoutConnection::tell() {
+std::int64_t ShoutConnection::tell() {
     if (!m_pShout) {
         return -1;
     }
     return -1;
 }
 // These are not used for streaming, but the interface requires them
-void ShoutConnection::seek(int pos) {
+void ShoutConnection::seek(std::int64_t pos) {
     Q_UNUSED(pos)
     return;
 }
 // These are not used for streaming, but the interface requires them
-int ShoutConnection::filelen() {
+std::int64_t ShoutConnection::filelen() {
     return 0;
 }
 

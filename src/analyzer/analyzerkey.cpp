@@ -1,8 +1,7 @@
 #include "analyzer/analyzerkey.h"
 
-#include <exception>
-
 #include <QtDebug>
+#include <exception>
 
 #include "analyzer/analyzertrack.h"
 #include "analyzer/constants.h"

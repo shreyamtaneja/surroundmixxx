@@ -244,6 +244,10 @@ void EncoderFdkAac::setEncoderSettings(const EncoderSettings& settings) {
     case EncoderSettings::ChannelMode::AUTOMATIC:
         m_channels = 2;
         break;
+    case EncoderSettings::ChannelMode::SURROUND_5_1:
+        kLogger.warning() << "5.1 recording is not supported by this encoder";
+        m_channels = 0;
+        break;
     }
 }
 

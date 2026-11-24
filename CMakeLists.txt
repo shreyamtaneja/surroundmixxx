@@ -2963,6 +2963,7 @@ if(BUILD_TESTING)
     src/test/durationutiltest.cpp
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp
+    src/test/encoderrecordingtest.cpp
     src/test/enginebufferscalelineartest.cpp
     src/test/enginebuffertest.cpp
     src/test/enginefilterbiquadtest.cpp
@@ -4883,6 +4884,9 @@ endif()
 # SndFile
 find_package(SndFile REQUIRED)
 target_link_libraries(mixxx-lib PRIVATE SndFile::sndfile)
+if(BUILD_TESTING)
+  target_link_libraries(mixxx-test PRIVATE SndFile::sndfile)
+endif()
 target_compile_definitions(mixxx-lib PUBLIC __SNDFILE__)
 if(SndFile_SUPPORTS_SET_COMPRESSION_LEVEL)
   target_compile_definitions(

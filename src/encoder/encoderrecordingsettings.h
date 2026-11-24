@@ -50,9 +50,11 @@ class EncoderRecordingSettings : public EncoderSettings {
                 ConfigKey(RECORDING_PREF_KEY, "channel_mode"), 0);
 
         switch (channelMode) {
-        case 1:
+        case mixxx::recording::kMono:
             return ChannelMode::MONO;
-        case 0: // fallthrough
+        case mixxx::recording::kSurround51:
+            return ChannelMode::SURROUND_5_1;
+        case mixxx::recording::kStereo: // fallthrough
         default:
             return ChannelMode::STEREO;
         }

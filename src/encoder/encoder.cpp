@@ -40,9 +40,9 @@ const EncoderFactory& EncoderFactory::getFactory()
 
 EncoderFactory::EncoderFactory() {
     // Add new supported formats here. Also modify the getNewEncoder/getEncoderSettings method.
-    m_formats.append(Encoder::Format{"WAV PCM", ENCODING_WAVE, true, "wav"});
+    m_formats.append(Encoder::Format{"WAV PCM", ENCODING_WAVE, true, "wav", true});
     m_formats.append(Encoder::Format{"AIFF PCM", ENCODING_AIFF, true, "aiff"});
-    m_formats.append(Encoder::Format{"FLAC", ENCODING_FLAC, true, "flac"});
+    m_formats.append(Encoder::Format{"FLAC", ENCODING_FLAC, true, "flac", true});
     m_formats.append(Encoder::Format{"MP3", ENCODING_MP3, false, "mp3"});
     m_formats.append(Encoder::Format{"OGG Vorbis", ENCODING_OGG, false, "ogg"});
 #ifdef __OPUS__
@@ -85,6 +85,12 @@ EncoderPointer EncoderFactory::createRecordingEncoder(
 EncoderPointer EncoderFactory::createEncoder(
         EncoderSettingsPointer pSettings,
         EncoderCallback* pCallback) const {
+    if (pSettings &&
+            pSettings->getChannelMode() == EncoderSettings::ChannelMode::SURROUND_5_1 &&
+            !getFormatFor(pSettings->getFormat()).supportsSurround51) {
+        qWarning() << "Encoder does not support 5.1 recording:" << pSettings->getFormat();
+        return {};
+    }
     EncoderPointer pEncoder;
     if (pSettings && pSettings->getFormat() == ENCODING_WAVE) {
         pEncoder = std::make_shared<EncoderWave>(pCallback);
